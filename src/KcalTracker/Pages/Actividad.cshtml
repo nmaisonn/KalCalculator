@@ -1,0 +1,122 @@
+@page
+@model KcalTracker.Pages.ActividadModel
+@using KcalTracker
+@{
+    ViewData["Title"] = "Actividad";
+    ViewData["Nav"] = "actividad";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Actividad</h1>
+        <p class="lede">De dónde sale el gasto y el catálogo de lo que no es gym. El gym vive en Rutinas.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn-pri" asp-page="/Actividad" asp-route-nueva="true">+ Actividad</a>
+    </div>
+</div>
+<div class="page-body">
+
+<section class="bloque">
+    <h2>Cómo se arma el gasto</h2>
+    <p class="ayuda">El entrenamiento nunca entra en el factor: se suma aparte y en bruto.</p>
+    <div class="formula-gasto">
+        <span class="pieza">GER medido <strong>@(Model.Bmr is { } b ? Formato.Kcal(b) : "—")</strong></span>
+        <span class="eq">×</span>
+        <span class="pieza">factor cotidiano <strong>× @Formato.Factor(Model.Factor)</strong></span>
+        <span class="eq">=</span>
+        <span class="pill tinta">@(Model.GastoSin is { } gastoBase ? Formato.Kcal(gastoBase) : "—")<span>kcal</span></span>
+        <span class="eq">+ deporte explícito del día</span>
+    </div>
+</section>
+
+@if (Model.Aviso is not null) { <p class="ok">@Model.Aviso</p> }
+@if (Model.Error is not null) { <p class="error">@Model.Error</p> }
+
+@if (Model.Editando is not null)
+{
+    <section class="bloque">
+        <h2>@(Model.Id == 0 ? "Nueva actividad" : "Editar actividad")</h2>
+        @if (!string.IsNullOrEmpty(Model.Vuelta))
+        {
+            <p class="aviso">Al guardar volvés al día desde el que viniste.</p>
+        }
+        <form method="post" asp-page-handler="Guardar">
+            <input type="hidden" asp-for="Id" />
+            <div class="form-grid">
+                <div>
+                    <label>Nombre</label>
+                    <input asp-for="Nombre" />
+                </div>
+                <div>
+                    <label>Tipo</label>
+                    <select asp-for="TipoActividadId">
+                        @foreach (var t in Model.Tipos)
+                        {
+                            <option value="@t.Id">@t.Nombre</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label>kcal</label>
+                    <input asp-for="Kcal" type="number" step="1" class="corto" />
+                </div>
+                <div>
+                    <label>Minutos</label>
+                    <input asp-for="Minutos" type="number" step="1" class="corto" />
+                </div>
+            </div>
+            <input type="hidden" asp-for="Vuelta" />
+            <div class="ajuste-cta">
+                <button type="submit" class="btn-pri">Guardar</button>
+                @if (!string.IsNullOrEmpty(Model.Vuelta))
+                {
+                    <a class="btn-sec" href="@Model.Vuelta">Cancelar</a>
+                }
+                else
+                {
+                    <a class="btn-sec" asp-page="/Actividad">Cancelar</a>
+                }
+                @if (Model.Id != 0)
+                {
+                    <button type="submit" formaction="@Url.Page("/Actividad", "Borrar", new { id = Model.Id })" class="btn-peligro" formnovalidate>Desactivar</button>
+                }
+            </div>
+        </form>
+    </section>
+}
+
+@if (Model.Lista.Count == 0)
+{
+    <p class="muted">No hay actividades en el catálogo.</p>
+}
+else
+{
+    <div class="tabla-wrap">
+        <table class="datos">
+            <thead>
+                <tr><th>Actividad</th><th>Tipo</th><th>kcal</th><th>Gasto del día</th><th>Sesiones</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var a in Model.Lista)
+            {
+                <tr>
+                    <td>@a.Nombre</td>
+                    <td>@a.TipoActividad?.Nombre</td>
+                    <td>@Formato.Kcal(a.Kcal)</td>
+                    <td>@(Model.GastoSin is { } gastoDia ? Formato.Kcal(gastoDia + a.Kcal) : "—")</td>
+                    <td>@(Model.Usos.GetValueOrDefault(a.Id) is var n && n > 0 ? n.ToString() : "—")</td>
+                    <td class="fila-acciones">
+                        <a class="btn-sec" asp-page="/Actividad" asp-route-id="@a.Id">Editar</a>
+                        <form method="post" asp-page-handler="Borrar" asp-route-id="@a.Id" class="inline">
+                            <button type="submit" class="btn-borrar">Borrar</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+<p class="muted">Las kcal las definís vos. Editar una actividad no cambia las sesiones ya registradas.</p>
+</div>

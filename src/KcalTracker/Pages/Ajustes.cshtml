@@ -1,0 +1,365 @@
+@page
+@model KcalTracker.Pages.AjustesModel
+@using KcalTracker.Calculo
+@using KcalTracker.Dominio
+@using KcalTracker.Servicios
+@{
+    ViewData["Title"] = "Ajustes";
+    ViewData["Nav"] = "ajustes";
+    var tab = Model.Tab?.ToLowerInvariant() ?? "perfil";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Ajustes</h1>
+        <p class="lede">Perfil, tipos, constantes y cuenta. El recorte diario se edita en Objetivo.</p>
+    </div>
+</div>
+<div class="page-body">
+<nav class="tabs" aria-label="Secciones de ajustes">
+    <a class="@(tab == "perfil" ? "on" : "")" asp-page="/Ajustes" asp-route-tab="perfil">Perfil</a>
+    <a class="@(tab == "objetivo" ? "on" : "")" asp-page="/Ajustes" asp-route-tab="objetivo">Objetivo</a>
+    <a class="@(tab == "tipos" ? "on" : "")" asp-page="/Ajustes" asp-route-tab="tipos">Tipos</a>
+    <a class="@(tab == "calculo" ? "on" : "")" asp-page="/Ajustes" asp-route-tab="calculo">Cálculo</a>
+    <a class="@(tab == "cuenta" ? "on" : "")" asp-page="/Ajustes" asp-route-tab="cuenta">Cuenta</a>
+</nav>
+
+@if (Model.Mensaje is not null)
+{
+    <p class="ok">@Model.Mensaje</p>
+}
+@if (Model.Error is not null)
+{
+    <p class="error">@Model.Error</p>
+}
+
+@if (tab == "perfil")
+{
+    <form method="post" asp-page-handler="GuardarPerfil" class="ajuste">
+        <input type="hidden" asp-for="Tab" value="perfil" />
+        <section class="ajuste-bloque">
+            <h2>Sobre vos</h2>
+            <div class="form-grid">
+                <div>
+                    <label asp-for="Nombre">Nombre <span class="opcional">(opcional)</span></label>
+                    <input asp-for="Nombre" autocomplete="name" />
+                </div>
+                <div>
+                    <label asp-for="AlturaCm">Altura (cm)</label>
+                    <input asp-for="AlturaCm" type="number" step="0.1" class="corto" inputmode="decimal" />
+                </div>
+                <div>
+                    <label asp-for="FechaNacimiento">Fecha de nacimiento</label>
+                    <input asp-for="FechaNacimiento" type="date" />
+                </div>
+                <div>
+                    <p class="etiqueta">Sexo</p>
+                    <div class="opciones-h">
+                        <label class="opcion-chip"><input type="radio" asp-for="SexoElegido" value="m" /> Masculino</label>
+                        <label class="opcion-chip"><input type="radio" asp-for="SexoElegido" value="f" /> Femenino</label>
+                        <label class="opcion-chip"><input type="radio" asp-for="SexoElegido" value="" /> Prefiero no decirlo</label>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="ajuste-bloque">
+            <h2>Alimentos</h2>
+            <p class="ayuda">El catálogo de la app viene precargado para registrar desde el primer día. Si ya tenés los tuyos, «Solo los míos» deja el desplegable de Hoy corto.</p>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="FuenteAlimentos" value="@FuenteAlimentos.Propios" />
+                <span class="txt"><strong>Solo los míos</strong><span class="muted">Los que cargaste vos. El desplegable queda chico.</span></span>
+            </label>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="FuenteAlimentos" value="@FuenteAlimentos.Ambos" />
+                <span class="txt"><strong>Los míos y el catálogo</strong><span class="muted">Arranque típico: precargados más lo que vas agregando.</span></span>
+            </label>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="FuenteAlimentos" value="@FuenteAlimentos.Catalogo" />
+                <span class="txt"><strong>Catálogo de la app</strong><span class="muted">Solo los precargados. Si cargás uno tuyo, pasás a ambos.</span></span>
+            </label>
+        </section>
+
+        <section class="ajuste-bloque">
+            <h2>Actividad fuera del gym</h2>
+            <p class="ayuda">El GER de la báscula es acostado. Este factor lo pasa al día sentado, sin gym ni cinta.
+                @if (Model.BmrElegido?.Kcal is { } ger)
+                {
+                    var cot = ger * Model.Perfil.FactorActividad;
+                    <text>Con tu GER (@Formato.Kcal(ger)) × @Formato.Factor(Model.Perfil.FactorActividad) da ~@Formato.Kcal(cot) kcal.</text>
+                }
+                Gym, cinta y deporte se suman aparte.</p>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="FactorElegido" value="1.2" />
+                <span class="txt"><strong>Sedentario</strong><span class="muted">Trabajo de escritorio</span></span>
+                <span class="kcal-op">× 1,2@(Model.BmrElegido?.Kcal is { } g12 ? " · " + Formato.Kcal(g12 * 1.2) : "")</span>
+            </label>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="FactorElegido" value="1.35" />
+                <span class="txt"><strong>Oficina y algo de caminar</strong><span class="muted">El valor de partida más realista</span></span>
+                <span class="kcal-op">× 1,35@(Model.BmrElegido?.Kcal is { } g135 ? " · " + Formato.Kcal(g135 * 1.35) : "")</span>
+            </label>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="FactorElegido" value="1.5" />
+                <span class="txt"><strong>Muy activo</strong><span class="muted">Trabajo de pie o te movés todo el día</span></span>
+                <span class="kcal-op">× 1,5@(Model.BmrElegido?.Kcal is { } g15 ? " · " + Formato.Kcal(g15 * 1.5) : "")</span>
+            </label>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="FactorElegido" value="otro" />
+                <span class="txt"><strong>Otro valor</strong>
+                    <input asp-for="FactorLibre" type="number" step="0.01" class="corto" inputmode="decimal" onclick="this.closest('label').querySelector('input[type=radio]').checked = true" />
+                </span>
+            </label>
+            <div class="ajuste-cta">
+                <button type="submit" class="btn-pri">Guardar perfil</button>
+            </div>
+        </section>
+    </form>
+}
+
+@if (tab == "objetivo")
+{
+    <section class="ajuste-bloque">
+        <h2>Lo que está vigente</h2>
+        <p class="ayuda">Acá no se edita el recorte: eso vive en Objetivo, donde se ven las tres opciones con kcal.</p>
+        @if (Model.Deficit is { } defAjuste)
+        {
+            <div class="ajuste-resumen">
+                <div class="stat">
+                    <div class="l">Objetivo</div>
+                    <div class="v">@defAjuste.Nombre</div>
+                </div>
+                <div class="stat">
+                    <div class="l">@defAjuste.Etiqueta</div>
+                    <div class="v">@Formato.Kcal(defAjuste.Diario)<span class="u">kcal</span></div>
+                </div>
+                @if (Model.Perfil.GrasaObjetivoPct is { } g)
+                {
+                    <div class="stat">
+                        <div class="l">Grasa objetivo</div>
+                        <div class="v">@g.ToString("0")<span class="u">%</span></div>
+                    </div>
+                }
+                <div class="stat">
+                    <div class="l">Plazo</div>
+                    <div class="v">@Model.Perfil.PlazoSemanas<span class="u">sem</span></div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <p class="muted">Todavía no hay un recorte calculado. Completá el perfil y una medición, y abrí Objetivo.</p>
+        }
+        <p class="ajuste-cta">
+            <a class="btn-pri" asp-page="/Objetivo">Abrir objetivo</a>
+            <a class="btn-sec" asp-page="/Ajustes" asp-route-tab="calculo">Constantes de cálculo</a>
+        </p>
+        @if (Model.Alcance is { Llega: false } alAjuste)
+        {
+            ViewData["AlcanceAcciones"] = false;
+            <partial name="_AlcanceNota" model="alAjuste" />
+        }
+    </section>
+}
+
+@if (tab == "tipos")
+{
+    <p class="ayuda" style="margin-top:0">Renombrá, reordená o desactivá. Desactivar no toca el histórico. El nombre se guarda solo al salir del campo. Los <strong>tipos de comida</strong> son los tramos del día. Los <strong>tipos de alimento</strong> agrupan el desplegable de Hoy.</p>
+    <div class="catalogos">
+        <partial name="_ListaCatalogo" model="new ListaCatalogoModelo { Catalogo = Catalogo.Comida, Titulo = AjustesModel.TituloDe(Catalogo.Comida), Items = Model.TiposComida }" />
+        <partial name="_ListaCatalogo" model="new ListaCatalogoModelo { Catalogo = Catalogo.Actividad, Titulo = AjustesModel.TituloDe(Catalogo.Actividad), Items = Model.TiposActividad }" />
+        <partial name="_ListaCatalogo" model="new ListaCatalogoModelo { Catalogo = Catalogo.Categoria, Titulo = AjustesModel.TituloDe(Catalogo.Categoria), Items = Model.Categorias }" />
+        <partial name="_ListaCatalogo" model="new ListaCatalogoModelo { Catalogo = Catalogo.Musculo, Titulo = AjustesModel.TituloDe(Catalogo.Musculo), Items = Model.Grupos }" />
+    </div>
+}
+
+@if (tab == "calculo")
+{
+    <form method="post" asp-page-handler="GuardarCalculo" class="ajuste">
+        <input type="hidden" asp-for="Tab" value="calculo" />
+        @if (Model.AvisoCalculo is not null)
+        {
+            <p class="aviso">@Model.AvisoCalculo</p>
+        }
+        <section class="ajuste-bloque">
+            <h2>Metabolismo basal</h2>
+            <p class="ayuda">Elegí cómo se calcula el GER. No uses el valor de la báscula como gasto del día:
+                @if (Model.BmrElegido?.Kcal is { } gerCalc)
+                {
+                    <text>× @Formato.Factor(Model.Perfil.FactorActividad) lo pasa a sentado (~@Formato.Kcal(gerCalc * Model.Perfil.FactorActividad) kcal con @Formato.Kcal(gerCalc)).</text>
+                }
+                else
+                {
+                    <text>× @Formato.Factor(Model.Perfil.FactorActividad) lo pasa a sentado.</text>
+                }
+            </p>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="MetodoBmr" value="KatchMcArdle" />
+                <span class="txt"><strong>Katch-McArdle</strong><span class="muted">Usa tu masa magra medida</span></span>
+                <span class="kcal-op">@(Model.BmrKatch?.Kcal is { } k ? Formato.Kcal(k) + " kcal" : "")</span>
+            </label>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="MetodoBmr" value="Mifflin" />
+                <span class="txt"><strong>Mifflin-St Jeor</strong><span class="muted">Peso, altura, edad y sexo. Es el estándar si no hay % de grasa@(Model.BmrMifflin?.Aviso is { } avisoM ? " · " + avisoM : "")</span></span>
+                <span class="kcal-op">@(Model.BmrMifflin?.Kcal is { } mif ? Formato.Kcal(mif) + " kcal" : "")</span>
+            </label>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="MetodoBmr" value="Medido" />
+                <span class="txt"><strong>Valor medido</strong><span class="muted">GER de la báscula, acostado</span></span>
+                <span class="kcal-op">
+                    <input asp-for="BmrMedido" type="number" step="1" class="corto" inputmode="numeric"
+                           onclick="this.closest('label').querySelector('input[type=radio]').checked = true" /> kcal
+                </span>
+            </label>
+            @if (Model.BmrElegido?.UsoRespaldo == true)
+            {
+                <p class="aviso">@Model.BmrElegido.Aviso</p>
+            }
+            else if (Model.Medicion is { } med)
+            {
+                <p class="ayuda">Ahora se usa @(Model.Cfg.MetodoBmr switch {
+                    MetodoBmr.KatchMcArdle => "Katch-McArdle",
+                    MetodoBmr.Mifflin => "Mifflin-St Jeor",
+                    MetodoBmr.Medido => "el valor medido",
+                    _ => Model.Cfg.MetodoBmr.ToString()
+                }) sobre la medición del @med.Fecha.ToString("dd/MM/yyyy").</p>
+            }
+            else
+            {
+                <p class="ayuda">Sin mediciones todavía: el método queda guardado y se aplica cuando haya una.</p>
+            }
+        </section>
+
+        @{
+            var sug = Model.Sugeridas ?? ConstantesNutricion.Calcular(Model.Medicion?.GrasaPct);
+        }
+        <section class="ajuste-bloque">
+            <h2>Constantes fisiológicas</h2>
+            <p class="ayuda">La grasa corporal no es lípido puro: ~87 % lípido. 9,4 kcal/g × 0,87 × 1000 = @sug.KcalPorKgGrasa.ToString("0") kcal/kg. El tejido magro ronda 1,8 kcal/g (Hall).</p>
+            <div class="ajuste-dato">
+                <div>
+                    <div class="ajuste-dato-n">kcal por kilo de grasa corporal</div>
+                    <div class="muted mini">calculado @sug.KcalPorKgGrasa.ToString("0")</div>
+                </div>
+                <input asp-for="KcalPorKgGrasa" type="number" step="1" class="corto" inputmode="numeric" />
+            </div>
+            <div class="ajuste-dato">
+                <div>
+                    <div class="ajuste-dato-n">kcal por kilo de tejido magro</div>
+                    <div class="muted mini">calculado @sug.KcalPorKgMagro.ToString("0")</div>
+                </div>
+                <input asp-for="KcalPorKgMagro" type="number" step="1" class="corto" inputmode="numeric" />
+            </div>
+        </section>
+
+        <section class="ajuste-bloque">
+            <h2>Límites de seguridad del déficit</h2>
+            <p class="ayuda">
+                @if (Model.Medicion?.GrasaPct is { } gp)
+                {
+                    <text>Con @gp.ToString("0.#") % de grasa, el techo es más conservador si estás magro (Helms/ACSM):
+                    @Formato.Pct(sug.PctGastoMax) del gasto y @Formato.Pct(sug.PctPesoSemanal) del peso por semana.
+                    Si dejás el valor de fábrica, Objetivo, Hoy y el dashboard usan el sugerido. Si ponés otro número, se respeta en las kcal y en los textos.</text>
+                }
+                else
+                {
+                    <text>Sin % de grasa se usa @Formato.Pct(ValoresDeFabrica.PctGastoMax) del gasto y @Formato.Pct(ValoresDeFabrica.PctPesoSemanal) del peso/semana. Cargá una medición para ajustarlo a tu composición.</text>
+                }
+            </p>
+            <div class="ajuste-dato">
+                <div>
+                    <div class="ajuste-dato-n">Máximo % del gasto diario</div>
+                    <div class="muted mini">calculado @((sug.PctGastoMax * 100).ToString("0.#")) %</div>
+                </div>
+                <span class="ajuste-dato-ctrl"><input asp-for="PctGastoMaxPct" type="number" step="0.1" class="corto" inputmode="decimal" /> %</span>
+            </div>
+            <div class="ajuste-dato">
+                <div>
+                    <div class="ajuste-dato-n">Máximo % del peso por semana</div>
+                    <div class="muted mini">calculado @((sug.PctPesoSemanal * 100).ToString("0.##")) %</div>
+                </div>
+                <span class="ajuste-dato-ctrl"><input asp-for="PctPesoSemanalPct" type="number" step="0.05" class="corto" inputmode="decimal" /> %</span>
+            </div>
+            @if (Model.Plan is { } p)
+            {
+                <p class="ayuda">Con tus datos y estos techos, el déficit máximo queda en <b>@Redondeo.Kcal(p.TechoDiario) kcal/día</b>.</p>
+            }
+        </section>
+
+        <section class="ajuste-bloque">
+            <h2>Umbrales de confiabilidad</h2>
+            <p class="ayuda">Para contrastar con la báscula hacen falta al menos 7 días de comida en 14 (50 %). Para fiarse del gasto calibrado, ~5 días por semana (70 %).</p>
+            <div class="ajuste-dato">
+                <div>
+                    <div class="ajuste-dato-n">Cobertura para comparar con la báscula</div>
+                    <div class="muted mini">calculado @((sug.CobMinContraste * 100).ToString("0")) %</div>
+                </div>
+                <span class="ajuste-dato-ctrl"><input asp-for="CobMinContrastePct" type="number" step="1" class="corto" inputmode="numeric" /> %</span>
+            </div>
+            <div class="ajuste-dato">
+                <div>
+                    <div class="ajuste-dato-n">Cobertura para usar el gasto calibrado</div>
+                    <div class="muted mini">calculado @((sug.CobMinCalibrado * 100).ToString("0")) %</div>
+                </div>
+                <span class="ajuste-dato-ctrl"><input asp-for="CobMinCalibradoPct" type="number" step="1" class="corto" inputmode="numeric" /> %</span>
+            </div>
+            <div class="ajuste-cta">
+                <button type="submit" class="btn-pri">Guardar cambios</button>
+                <button type="submit" asp-page-handler="RestaurarCalculo" class="btn-sec" formnovalidate>Usar valores calculados</button>
+            </div>
+        </section>
+    </form>
+}
+
+@if (tab == "cuenta")
+{
+    <section class="ajuste-bloque">
+        <h2>Tu cuenta</h2>
+        <p class="ajuste-mail">@Model.Cuenta.Email</p>
+        <p class="muted mini">Creada el @Model.Cuenta.CreadoEl.ToString("dd/MM/yyyy")</p>
+        <div class="ajuste-resumen">
+            <div class="stat"><div class="l">Comidas</div><div class="v">@Model.Comidas</div></div>
+            <div class="stat"><div class="l">Gym</div><div class="v">@Model.SesionesGym</div></div>
+            <div class="stat"><div class="l">Cardio</div><div class="v">@Model.SesionesCardio</div></div>
+            <div class="stat"><div class="l">Mediciones</div><div class="v">@Model.Mediciones</div></div>
+        </div>
+    </section>
+
+    <section class="ajuste-bloque">
+        <h2>Contraseña</h2>
+        <form method="post" asp-page-handler="CambiarClave" class="ajuste-form-corto">
+            <input type="hidden" asp-for="Tab" value="cuenta" />
+            <label asp-for="ClaveActual">Actual</label>
+            <input asp-for="ClaveActual" type="password" autocomplete="current-password" />
+            <label asp-for="ClaveNueva">Nueva</label>
+            <input asp-for="ClaveNueva" type="password" autocomplete="new-password" />
+            <label asp-for="ClaveNueva2">Repetir</label>
+            <input asp-for="ClaveNueva2" type="password" autocomplete="new-password" />
+            <button type="submit">Cambiar contraseña</button>
+        </form>
+    </section>
+
+    <section class="ajuste-bloque">
+        <h2>Tus datos</h2>
+        <p class="ayuda">Las plantillas se copian a tu cuenta y después son tuyas. Los datos viven en esta máquina (%LOCALAPPDATA%\kcal-tracker\kcal.db). Para un período (comida, entreno y mediciones, pensado para una IA) usá <a asp-page="/Dashboard">Dashboard → Exportar para analizar</a>.</p>
+        <div class="ajuste-cta">
+            <a class="btn-sec" asp-page="/Bienvenida" asp-route-repetir="true">Importar plantillas</a>
+            <form method="get" asp-page-handler="Exportar" class="inline">
+                <input type="hidden" name="tab" value="cuenta" />
+                <button type="submit" class="btn-sec">Exportar todo a JSON</button>
+            </form>
+        </div>
+    </section>
+
+    <section class="ajuste-bloque ajuste-peligro">
+        <h2>Eliminar la cuenta</h2>
+        <p class="ayuda">Se borra todo y no hay vuelta atrás.</p>
+        <form method="post" asp-page-handler="EliminarCuenta" class="ajuste-form-corto">
+            <input type="hidden" asp-for="Tab" value="cuenta" />
+            <label asp-for="CorreoConfirmacion">Escribí tu correo para confirmar</label>
+            <input asp-for="CorreoConfirmacion" type="email" autocomplete="off" />
+            <button type="submit" class="peligro">Eliminar mi cuenta y todos mis datos</button>
+        </form>
+    </section>
+}
+</div>

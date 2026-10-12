@@ -1,0 +1,215 @@
+@page
+@model KcalTracker.Pages.RutinasModel
+@{
+    ViewData["Title"] = "Rutinas";
+    ViewData["Nav"] = "rutinas";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Rutinas</h1>
+        <p class="lede">Lo que prescribís. Las kcal del día se proponen al entrenar; no van en el catálogo de actividades. Editar acá no cambia las sesiones ya hechas.</p>
+    </div>
+    <div class="page-actions">
+        @if (!string.IsNullOrEmpty(Model.Vuelta))
+        {
+            <a class="btn-sec" href="@Model.Vuelta">← Volver al día</a>
+        }
+        <a class="btn-pri" asp-page="/Rutinas" asp-route-nuevo="true" asp-route-vuelta="@Model.Vuelta">+ Nueva rutina</a>
+    </div>
+</div>
+<div class="page-body">
+
+@if (Model.Mensaje is not null) { <p class="ok">@Model.Mensaje</p> }
+@if (Model.Error is not null) { <p class="error">@Model.Error</p> }
+
+@if (Model.Rutinas.Count > 0)
+{
+    <nav class="tabs">
+        @foreach (var r in Model.Rutinas)
+        {
+            <a class="@(Model.Elegida?.Id == r.Id && !Model.Nueva ? "on" : "")" asp-page="/Rutinas" asp-route-id="@r.Id" asp-route-vuelta="@Model.Vuelta">
+                @r.Nombre@(r.EsActiva ? " · activa" : "")
+            </a>
+        }
+    </nav>
+}
+
+@if (Model.Nueva)
+{
+    <section class="bloque">
+        <h2>Nueva rutina</h2>
+        <form method="post" asp-page-handler="Crear">
+            <input type="hidden" asp-for="Vuelta" />
+            <div class="form-grid">
+                <div>
+                    <label>Nombre</label>
+                    <input asp-for="Nombre" autofocus />
+                </div>
+                <div>
+                    <label>Descripción <span class="opcional">(opcional)</span></label>
+                    <input asp-for="Descripcion" />
+                </div>
+            </div>
+            <div class="ajuste-cta">
+                <button type="submit" class="btn-pri">Crear</button>
+                <a class="btn-sec" asp-page="/Rutinas" asp-route-vuelta="@Model.Vuelta">Cancelar</a>
+            </div>
+        </form>
+    </section>
+}
+else if (Model.Elegida is { } rutina)
+{
+    <section class="bloque">
+        <form method="post" asp-page-handler="GuardarDatos" asp-route-id="@rutina.Id">
+            <input type="hidden" asp-for="Vuelta" />
+            <div class="form-grid">
+                <div>
+                    <label>Nombre</label>
+                    <input asp-for="Nombre" />
+                </div>
+                <div>
+                    <label>Descripción</label>
+                    <input asp-for="Descripcion" />
+                </div>
+            </div>
+            <p class="muted mini">@rutina.Dias.Count días · @rutina.Dias.Sum(d => d.Ejercicios.Count) ejercicios</p>
+            <div class="ajuste-cta">
+                <button type="submit" class="btn-pri">Guardar datos</button>
+            </div>
+        </form>
+        <div class="ajuste-cta">
+            @if (!rutina.EsActiva)
+            {
+                <form method="post" asp-page-handler="Activar" asp-route-id="@rutina.Id">
+                    <input type="hidden" asp-for="Vuelta" />
+                    <button type="submit" class="btn-sec">Usar como activa</button>
+                </form>
+            }
+            else
+            {
+                <span class="pill">activa</span>
+            }
+            <form method="post" asp-page-handler="Duplicar" asp-route-id="@rutina.Id">
+                <input type="hidden" asp-for="Vuelta" />
+                <button type="submit" class="btn-sec">Duplicar</button>
+            </form>
+            <a class="btn-sec" asp-page="/Ejercicios">Catálogo de ejercicios</a>
+            <form method="post" asp-page-handler="Eliminar" asp-route-id="@rutina.Id" onsubmit="return confirm('¿Eliminar esta rutina? Las sesiones ya hechas quedan.');">
+                <input type="hidden" asp-for="Vuelta" />
+                <button type="submit" class="btn-peligro">Eliminar</button>
+            </form>
+        </div>
+    </section>
+
+    @foreach (var dia in rutina.Dias.OrderBy(d => d.Orden))
+    {
+        <section class="bloque">
+            <form method="post" asp-page-handler="GuardarDia" asp-route-id="@rutina.Id" asp-route-diaId="@dia.Id" class="fila-dia">
+                <input type="hidden" asp-for="Vuelta" />
+                <label>Día</label>
+                <input name="DiaNombre" value="@dia.Nombre" />
+                <label>kcal estimadas</label>
+                <input name="DiaKcal" type="number" step="1" class="corto" value="@(dia.KcalEstimadas?.ToString("0") ?? "")" />
+                <button type="submit" class="btn-sec">Guardar día</button>
+            </form>
+            <div class="ajuste-cta" style="margin-top:0.65rem;padding-top:0.75rem">
+                <a class="btn-pri" asp-page="/Sesion" asp-route-dia="@dia.Id" asp-route-fecha="@DateOnly.FromDateTime(DateTime.Today)">Entrenar hoy</a>
+                <form method="post" asp-page-handler="QuitarDia" asp-route-id="@rutina.Id" asp-route-diaId="@dia.Id">
+                    <input type="hidden" asp-for="Vuelta" />
+                    <button type="submit" class="btn-peligro">Quitar día</button>
+                </form>
+            </div>
+
+            @if (dia.Ejercicios.Count == 0)
+            {
+                <p class="muted mini">Todavía no hay ejercicios en este día.</p>
+            }
+            else
+            {
+                <p class="muted mini">El orden importa: el de arriba se hace primero. Arrastrá el asa o usá las flechas.</p>
+                <ul class="lista-ej" data-orden-ej data-dia="@dia.Id" data-rutina="@rutina.Id">
+                @foreach (var e in dia.Ejercicios.OrderBy(x => x.Orden))
+                {
+                    <li data-id="@e.Id">
+                        <span class="asa" draggable="true" title="Arrastrar para reordenar" aria-label="Arrastrar @e.Ejercicio?.Nombre" role="button" tabindex="0">⋮⋮</span>
+                        <div class="cabeza-ej">
+                            <div>
+                                <b>@(e.Ejercicio?.Nombre ?? "—")</b>
+                                <span class="muted mini">@(e.Ejercicio?.GrupoMuscular?.Nombre ?? "")</span>
+                            </div>
+                            <div class="fila-acciones">
+                                <button type="button" class="btn-sec subir" title="Subir" aria-label="Subir">↑</button>
+                                <button type="button" class="btn-sec bajar" title="Bajar" aria-label="Bajar">↓</button>
+                                <form method="post" asp-page-handler="QuitarEjercicio" asp-route-id="@rutina.Id" asp-route-itemId="@e.Id" class="inline">
+                                    <input type="hidden" asp-for="Vuelta" />
+                                    <button type="submit" class="btn-borrar">Quitar</button>
+                                </form>
+                            </div>
+                        </div>
+                        <form method="post" asp-page-handler="GuardarEjercicio" asp-route-id="@rutina.Id" asp-route-itemId="@e.Id" class="fila-ej">
+                            <input type="hidden" asp-for="Vuelta" />
+                            <label>Series <input name="Series" type="number" class="mini-num" value="@e.Series" /></label>
+                            <label>Reps <input name="RepsMin" type="number" class="mini-num" value="@e.RepsMin" /></label>
+                            <label>a <input name="RepsMax" type="number" class="mini-num" value="@e.RepsMax" /></label>
+                            <label>kg <input name="PesoRef" type="number" step="0.1" class="mini-num" value="@(e.PesoRef?.ToString("0.##") ?? "")" /></label>
+                            <label class="opcion" style="margin:0">
+                                <input name="PuedeMas" type="checkbox" value="true" @(e.PuedeMas ? "checked" : null) /> +
+                            </label>
+                            <input name="Observacion" value="@e.Observacion" placeholder="nota" />
+                            <button type="submit" class="btn-sec">Guardar</button>
+                        </form>
+                    </li>
+                }
+                </ul>
+            }
+
+            @if (Model.Catalogo.Count == 0)
+            {
+                <p class="muted">No hay ejercicios en el catálogo. <a asp-page="/Ejercicios" asp-route-nuevo="true">Cargá uno</a> y volvé.</p>
+            }
+            else
+            {
+                <form method="post" asp-page-handler="AgregarEjercicio" asp-route-id="@rutina.Id" asp-route-diaId="@dia.Id" class="fila-ej alta-ej">
+                    <input type="hidden" asp-for="Vuelta" />
+                    <select name="EjercicioId" required>
+                        <option value="">+ Agregar ejercicio…</option>
+                        @foreach (var g in Model.Catalogo.GroupBy(x => x.GrupoMuscular?.Nombre ?? "Sin grupo"))
+                        {
+                            <optgroup label="@g.Key">
+                            @foreach (var ej in g)
+                            {
+                                <option value="@ej.Id">@ej.Nombre</option>
+                            }
+                            </optgroup>
+                        }
+                    </select>
+                    <input name="Series" type="number" class="mini-num" value="3" title="Series" />
+                    <input name="RepsMin" type="number" class="mini-num" value="8" title="Reps min" />
+                    <input name="RepsMax" type="number" class="mini-num" value="10" title="Reps máx" />
+                    <input name="PesoRef" type="number" step="0.1" class="mini-num" placeholder="kg" />
+                    <label class="opcion" style="margin:0"><input name="PuedeMas" type="checkbox" value="true" /> +</label>
+                    <input name="Observacion" placeholder="nota" />
+                    <button type="submit" class="btn-pri">Agregar</button>
+                </form>
+            }
+        </section>
+    }
+
+    <section class="bloque">
+        <h2>Agregar un día</h2>
+        <form method="post" asp-page-handler="AgregarDia" asp-route-id="@rutina.Id" class="fila-dia">
+            <input type="hidden" asp-for="Vuelta" />
+            <label>Nombre</label>
+            <input asp-for="DiaNombre" placeholder="Día 1 — Espalda + bíceps" />
+            <label>kcal estimadas</label>
+            <input asp-for="DiaKcal" type="number" step="1" class="corto" />
+            <button type="submit" class="btn-pri">Agregar día</button>
+        </form>
+    </section>
+}
+else
+{
+    <p class="muted">No hay rutinas. Creá una o importá la de la plantilla desde Ajustes → Cuenta.</p>
+}
+</div>

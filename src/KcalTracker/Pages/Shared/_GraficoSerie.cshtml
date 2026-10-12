@@ -1,0 +1,51 @@
+@model KcalTracker.Calculo.VistaGraficoSerie
+@using System.Globalization
+@using KcalTracker
+@{
+    string N(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+    string Valor(double v) => Model.TipoEje switch
+    {
+        "kg" => Formato.Kg(v, 1) + " kg",
+        "kg2" => Formato.Kg(v) + " kg",
+        "pct" => v.ToString("0.#") + " %",
+        _ => v.ToString("0.#")
+    };
+}
+
+<section class="chart-box @Model.Clase">
+    <h2>@Model.Titulo</h2>
+    <p class="chart-lectura">@Model.Lectura</p>
+    @if (Model.Grafico is { } g)
+    {
+        <div class="prog-graf @Model.Clase" data-graf>
+            <svg viewBox="0 0 @N(g.Ancho) @N(g.Alto)" role="img" aria-label="@Model.Aria. Pasá por un punto para ver fecha y valor.">
+                <line class="grid" x1="@N(g.XIni)" y1="@N(g.YMaxY)" x2="@N(g.XFin)" y2="@N(g.YMaxY)" />
+                <line class="grid" x1="@N(g.XIni)" y1="@N(g.YMinY)" x2="@N(g.XFin)" y2="@N(g.YMinY)" />
+                @if (g.ObjetivoY is { } yo)
+                {
+                    <line class="objetivo" x1="@N(g.XIni)" y1="@N(yo)" x2="@N(g.XFin)" y2="@N(yo)" />
+                }
+                <path class="area" d="@g.PathArea" />
+                <path class="linea" d="@g.Path" />
+                @foreach (var p in g.Puntos)
+                {
+                    var ultimo = p == g.Puntos[^1];
+                    var fecha = Formato.FechaCorta(p.Fecha);
+                    var valor = Valor(p.Valor);
+                    <g class="punto-g @(ultimo ? "ultimo" : null)" tabindex="0"
+                       data-fecha="@fecha" data-valor="@valor" aria-label="@fecha, @valor">
+                        <line class="guia" x1="@N(p.X)" y1="12" x2="@N(p.X)" y2="@N(g.YBase)" />
+                        <circle class="hit" cx="@N(p.X)" cy="@N(p.Y)" r="16" />
+                        <circle class="punto" cx="@N(p.X)" cy="@N(p.Y)" r="@(ultimo ? 5 : 4)" />
+                    </g>
+                }
+                <text class="eje" x="4" y="@N(g.YMaxY + 4)">@Model.EtiquetaMax</text>
+                <text class="eje" x="4" y="@N(g.YMinY + 4)">@Model.EtiquetaMin</text>
+                <text class="eje" x="@N(g.XIni)" y="@N(g.Alto - 6)">@Formato.FechaCorta(g.Puntos[0].Fecha)</text>
+                <text class="eje" x="@N(g.XFin)" y="@N(g.Alto - 6)" text-anchor="end">@Formato.FechaCorta(g.Puntos[^1].Fecha)</text>
+            </svg>
+            <div class="graf-tip" hidden></div>
+        </div>
+        <p class="muted mini">Pasá el mouse o tocá un punto para ver fecha y valor.@(Model.LeyendaObjetivo is { } ley ? " " + ley : "")</p>
+    }
+</section>

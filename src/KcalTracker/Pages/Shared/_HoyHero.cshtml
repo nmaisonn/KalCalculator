@@ -1,0 +1,151 @@
+@model IndexModel
+@using System.Globalization
+@using KcalTracker
+@using KcalTracker.Calculo
+@{
+    var v = Model.Vista;
+    var b = v.Balance;
+    var meta = v.Deficit;
+    var obj = meta is { Diario: > 0 } d ? d.Diario : (double?)null;
+    var superavit = meta?.EsSuperavit == true;
+    var valorHoy = b.Deficit is { } defHoy ? (superavit ? -defHoy : defHoy) : (double?)null;
+    var cls = !b.HayRegistro ? ""
+        : valorHoy is { } vh && obj is { } objetivoHoy
+            ? vh >= objetivoHoy ? "ok" : vh < 0 ? "bad" : "warn"
+        : valorHoy < 0 && !superavit ? "bad"
+        : "";
+    var oob = Context.Request.Headers["HX-Target"].ToString()
+        .Contains("entreno", StringComparison.OrdinalIgnoreCase);
+    string AnchoPct(double parte, double total)
+        => total <= 0 ? "0" : Math.Clamp(parte / total * 100, 0, 100).ToString("0.##", CultureInfo.InvariantCulture);
+    string FaltaG(double? hecho, double objetivoG)
+    {
+        var delta = objetivoG - (hecho ?? 0);
+        if (delta > 1) return "faltan " + Formato.G(delta) + " g";
+        if (delta < -1) return Formato.G(-delta) + " g de más";
+        return "objetivo";
+    }
+}
+<section id="hoy-hero" class="hero-card" @(oob ? Html.Raw("hx-swap-oob=\"outerHTML\"") : null)>
+    <div class="hero-grid">
+        <div class="hero @cls hero-split">
+            <div class="l">@(superavit ? "Superávit de hoy" : "Déficit de hoy")</div>
+            @if (b.HayRegistro && valorHoy is { } val)
+            {
+                <div class="v">@(val >= 0 ? "" : "−")@Formato.Kcal(Math.Abs(val))<span class="u">kcal</span></div>
+                <div class="n">
+                    @if (meta is { } m)
+                    {
+                        <span class="muted">Objetivo: @m.Nombre.</span>
+                        @(" ")
+                    }
+                    @if (obj is { } objetivo)
+                    {
+                        @(val >= objetivo ? "Alcanzaste el objetivo diario de " + Formato.Kcal(objetivo) + " kcal."
+                            : val < 0 && superavit ? "Hoy hay déficit; para ganar músculo hace falta superávit."
+                            : val < 0 ? "Hoy hay superávit."
+                            : (superavit ? "Superávit en marcha, todavía no llega al objetivo diario de " : "Déficit en marcha, todavía no llega al objetivo diario de ") + Formato.Kcal(objetivo) + " kcal.")
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="v" style="color:var(--tinta-45)">sin registro</div>
+                <div class="n" style="color:var(--tinta-45)">Este día no tiene comidas cargadas. No se le asigna @(superavit ? "superávit" : "déficit").</div>
+            }
+        </div>
+        <div class="stats">
+            <div class="stat">
+                <div class="l">Ingesta</div>
+                <div class="v">@(b.HayRegistro ? Formato.Kcal(b.Ingesta!.Kcal) : "—")<span class="u">kcal</span></div>
+            </div>
+            <div class="stat">
+                <div class="l">Gasto</div>
+                <div class="v">@(v.GastoSinDeporte is null ? "—" : Formato.Kcal(b.Gasto.Total))<span class="u">kcal</span></div>
+                <div class="hint">basal + cotidiano + entreno</div>
+            </div>
+            <div class="stat">
+                <div class="l">A comer</div>
+                <div class="v">@(Model.Macros is { } ma ? Formato.Kcal(ma.KcalAComer) : "—")<span class="u">kcal</span></div>
+                <div class="hint">según Objetivo</div>
+            </div>
+            @if (Model.Macros is { } macrosHoy)
+            {
+                var ingesta = b.Ingesta;
+                var comido = ingesta?.Kcal ?? 0;
+                var techo = macrosHoy.KcalAComer < 1 ? 1 : macrosHoy.KcalAComer;
+                var pasado = comido > techo + 15;
+                var denom = pasado ? comido : techo;
+                var kp = (ingesta?.Proteina ?? 0) * 4;
+                var kc = (ingesta?.Carbos ?? 0) * 4;
+                var kg = (ingesta?.Grasa ?? 0) * 9;
+                var restoKcal = Math.Max(0, comido - kp - kc - kg);
+                var quedaKcal = techo - comido;
+                var protFalta = macrosHoy.ProteinaG - (ingesta?.Proteina ?? 0);
+                string textoCupo;
+                if (comido < 1)
+                {
+                    textoCupo = $"Todavía no comiste. Hoy hay {Formato.Kcal(techo)} kcal y {Formato.G(macrosHoy.ProteinaG)} g de proteína.";
+                }
+                else
+                {
+                    var kcalParte = quedaKcal > 20 ? $"Quedan {Formato.Kcal(quedaKcal)} kcal."
+                        : quedaKcal < -20 ? $"Te pasaste {Formato.Kcal(-quedaKcal)} kcal."
+                        : "Llegaste a las kcal del día.";
+                    var protParte = protFalta > 2 ? $" De proteína faltan {Formato.G(protFalta)} g."
+                        : protFalta < -2 ? $" La proteína ya está (vas {Formato.G(-protFalta)} g arriba)."
+                        : " La proteína está.";
+                    textoCupo = kcalParte + protParte;
+                }
+                <div class="macros-hoy">
+                    <div class="stat">
+                        <div class="l">Proteína</div>
+                        <div class="v" style="color:var(--verde)">@(b.Ingesta?.Proteina is { } prot ? Formato.G(prot) : "—")<span class="u">/ @Formato.G(macrosHoy.ProteinaG) g</span></div>
+                        <div class="prot-barra" title="Proteína del día"><span style="width:@(AnchoPct(b.Ingesta?.Proteina ?? 0, macrosHoy.ProteinaG))%"></span></div>
+                        <div class="hint">@FaltaG(b.Ingesta?.Proteina, macrosHoy.ProteinaG)</div>
+                    </div>
+                    <div class="stat">
+                        <div class="l">Carbos</div>
+                        <div class="v" style="color:var(--ambar)">@(b.Ingesta?.Carbos is { } cb ? Formato.G(cb) : "—")<span class="u">/ @Formato.G(macrosHoy.CarbosG) g</span></div>
+                        <div class="prot-barra carbos" title="Carbos del día"><span style="width:@(AnchoPct(b.Ingesta?.Carbos ?? 0, macrosHoy.CarbosG))%"></span></div>
+                        <div class="hint">@FaltaG(b.Ingesta?.Carbos, macrosHoy.CarbosG)</div>
+                    </div>
+                    <div class="stat">
+                        <div class="l">Grasa</div>
+                        <div class="v" style="color:var(--naranja)">@(b.Ingesta?.Grasa is { } gr ? Formato.G(gr) : "—")<span class="u">/ @Formato.G(macrosHoy.GrasaG) g</span></div>
+                        <div class="prot-barra grasa" title="Grasa del día"><span style="width:@(AnchoPct(b.Ingesta?.Grasa ?? 0, macrosHoy.GrasaG))%"></span></div>
+                        <div class="hint">@FaltaG(b.Ingesta?.Grasa, macrosHoy.GrasaG)</div>
+                    </div>
+                </div>
+                <div class="cupo">
+                    <div class="cupo-cabeza">
+                        <span class="l">Cupo de hoy</span>
+                        <span class="cupo-num">@Formato.Kcal(comido) / @Formato.Kcal(techo) kcal</span>
+                    </div>
+                    <div class="macrobar cupo-bar @(pasado ? "pasado" : "")" role="img" aria-label="@textoCupo">
+                        @if (kp > 0) { <span class="seg-p" style="width:@(AnchoPct(kp, denom))%" title="Proteína"></span> }
+                        @if (kc > 0) { <span class="seg-c" style="width:@(AnchoPct(kc, denom))%" title="Carbos"></span> }
+                        @if (kg > 0) { <span class="seg-g" style="width:@(AnchoPct(kg, denom))%" title="Grasa"></span> }
+                        @if (restoKcal > 1) { <span class="seg-kcal" style="width:@(AnchoPct(restoKcal, denom))%"></span> }
+                        @if (!pasado && quedaKcal > 1) { <span class="seg-queda" style="width:@(AnchoPct(quedaKcal, denom))%" title="Todavía no comidas"></span> }
+                    </div>
+                    <p class="cupo-txt">@textoCupo</p>
+                </div>
+            }
+            else
+            {
+                <div class="stat">
+                    <div class="l">Proteína</div>
+                    <div class="v" style="color:var(--verde)">@(b.Ingesta?.Proteina is { } prot ? Formato.G(prot) : "—")
+                        @if (Model.ProteinaObjetivo is { } po && b.Ingesta?.Proteina is not null)
+                        {
+                            <span class="u">/ @Formato.G(po) g</span>
+                        }
+                        else { <span class="u">g</span> }
+                    </div>
+                    <div class="hint">objetivo diario</div>
+                </div>
+            }
+        </div>
+    </div>
+</section>

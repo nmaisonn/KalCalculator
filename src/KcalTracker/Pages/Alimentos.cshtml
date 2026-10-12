@@ -1,0 +1,321 @@
+@page
+@model KcalTracker.Pages.AlimentosModel
+@using KcalTracker.Calculo
+@using KcalTracker.Dominio
+@using KcalTracker.Servicios
+@{
+    ViewData["Title"] = "Alimentos";
+    ViewData["Nav"] = "alimentos";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Alimentos</h1>
+        <p class="lede">Los tuyos, el catálogo de la app, o ambos. El catálogo no se edita: si querés cambiar uno, cargá tu copia.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn-sec" asp-page="/Combo">Combos</a>
+        <a class="btn-pri" asp-page="/Alimentos" asp-route-nuevo="true" asp-route-vuelta="@Model.Vuelta">+ Alimento</a>
+    </div>
+</div>
+<div class="page-body">
+@if (Model.Mensaje is not null) { <p class="ok">@Model.Mensaje</p> }
+@if (Model.Error is not null) { <p class="error">@Model.Error</p> }
+@foreach (var aviso in Model.ErroresImportacion)
+{
+    <p class="muted mini">@aviso</p>
+}
+
+<div class="fuente-alim">
+    <p class="ayuda">Qué ves en Hoy y en esta lista. El catálogo de la app no se edita.</p>
+    <div class="opciones-h">
+        @foreach (var f in new[] { FuenteAlimentos.Propios, FuenteAlimentos.Ambos, FuenteAlimentos.Catalogo })
+        {
+            <form method="post" asp-page-handler="Fuente" class="inline">
+                <input type="hidden" name="fuente" value="@f" />
+                <input type="hidden" name="Filtro" value="@Model.Filtro" />
+                <input type="hidden" name="Q" value="@Model.Q" />
+                <input type="hidden" name="Tipo" value="@Model.Tipo" />
+                <input type="hidden" name="Vuelta" value="@Model.Vuelta" />
+                <button type="submit" class="chip @(Model.Fuente == f ? "on" : "quiet")">@FuenteAlimentosNombres.De(f)</button>
+            </form>
+        }
+    </div>
+</div>
+
+@if (Model.Editando is not null)
+{
+    <div class="bloque">
+        <h2>@(Model.Id == 0 ? "Nuevo alimento" : "Editar alimento")</h2>
+        @if (!string.IsNullOrEmpty(Model.Vuelta))
+        {
+            <p class="aviso">Al guardar volvés al día desde el que viniste.</p>
+        }
+        <form method="post" asp-page-handler="Guardar">
+            <input type="hidden" asp-for="Id" />
+            <div class="form-grid">
+                <div class="span-2">
+                    <label>Nombre</label>
+                    <input asp-for="Nombre" />
+                </div>
+                <div>
+                    <label>Porción</label>
+                    <input asp-for="Porcion" />
+                </div>
+                <div>
+                    <label>kcal</label>
+                    <input asp-for="Kcal" type="number" step="0.1" class="corto" />
+                </div>
+                <div>
+                    <label>Proteína</label>
+                    <input asp-for="Proteina" type="number" step="0.1" class="corto" />
+                </div>
+                <div>
+                    <label>Carbos</label>
+                    <input asp-for="Carbos" type="number" step="0.1" class="corto" />
+                </div>
+                <div>
+                    <label>Grasa</label>
+                    <input asp-for="Grasa" type="number" step="0.1" class="corto" />
+                </div>
+                <div>
+                    <label>Tipo</label>
+                    <select asp-for="CategoriaAlimentoId">
+                        <option value="">Sin tipo</option>
+                        @foreach (var c in Model.Categorias)
+                        {
+                            <option value="@c.Id">@c.Nombre</option>
+                        }
+                    </select>
+                    <p class="ayuda">Así se agrupa en Hoy. «De afuera» cuenta solo las kcal. Los tipos se editan en Ajustes.</p>
+                </div>
+                <div>
+                    <label>Tramo</label>
+                    <select asp-for="TipoComidaId">
+                        <option value="">Sin tramo</option>
+                        @foreach (var t in Model.Tipos)
+                        {
+                            <option value="@t.Id">@t.Nombre</option>
+                        }
+                    </select>
+                    <p class="ayuda">Para ordenar la tabla. No limita en qué comida del día lo cargás.</p>
+                </div>
+            </div>
+            <input type="hidden" asp-for="Origen" />
+            <input type="hidden" asp-for="Vuelta" />
+            <input type="hidden" asp-for="Filtro" />
+            <input type="hidden" asp-for="Q" />
+            <input type="hidden" asp-for="Tipo" />
+            <div class="ajuste-cta">
+                <button type="submit" class="btn-pri">Guardar</button>
+                @if (!string.IsNullOrEmpty(Model.Vuelta))
+                {
+                    <a class="btn-sec" href="@Model.Vuelta">Cancelar</a>
+                }
+                else
+                {
+                    <a class="btn-sec" asp-page="/Alimentos">Cancelar</a>
+                }
+                @if (Model.Id != 0)
+                {
+                    <button type="submit" formaction="@Url.Page("/Alimentos", "Borrar", new { id = Model.Id })" class="btn-peligro" formnovalidate>Desactivar</button>
+                }
+            </div>
+        </form>
+    </div>
+}
+
+<form method="get" class="toolbar-lista"
+      hx-get="@Url.Page("/Alimentos")"
+      hx-trigger="keyup changed delay:300ms from:input[type=search], change from:select, search"
+      hx-select="#lista-alimentos" hx-target="#lista-alimentos" hx-push-url="true">
+    <label class="sr" for="q-lista">Buscar en tu lista</label>
+    <input id="q-lista" type="search" name="q" value="@Model.Q" placeholder="Buscar en tu lista…" autocomplete="off" />
+    <select name="tipo" aria-label="Tipo de comida">
+        <option value="">Todos los tramos</option>
+        @foreach (var t in Model.Tipos)
+        {
+            if (Model.Tipo == t.Id.ToString())
+            {
+                <option value="@t.Id" selected>@t.Nombre</option>
+            }
+            else
+            {
+                <option value="@t.Id">@t.Nombre</option>
+            }
+        }
+        @if (Model.Tipo == "sin")
+        {
+            <option value="sin" selected>Sin tramo</option>
+        }
+        else
+        {
+            <option value="sin">Sin tramo</option>
+        }
+    </select>
+    <input type="hidden" name="filtro" value="@Model.Filtro" />
+    <noscript><button type="submit" class="btn-sec">Filtrar</button></noscript>
+</form>
+
+<nav class="tabs">
+    <a class="@(Model.Filtro == "todos" ? "on" : "")" asp-page="/Alimentos" asp-route-filtro="todos" asp-route-q="@Model.Q" asp-route-tipo="@Model.Tipo">Todos</a>
+    <a class="@(Model.Filtro == "macros" ? "on" : "")" asp-page="/Alimentos" asp-route-filtro="macros" asp-route-q="@Model.Q" asp-route-tipo="@Model.Tipo">Con macros</a>
+    <a class="@(Model.Filtro == "afuera" ? "on" : "")" asp-page="/Alimentos" asp-route-filtro="afuera" asp-route-q="@Model.Q" asp-route-tipo="@Model.Tipo">De afuera</a>
+</nav>
+
+<div id="lista-alimentos">
+@if (Model.Lista.Count == 0)
+{
+    <p class="muted">@(Model.TotalLista == 0
+        ? Model.Fuente == FuenteAlimentos.Propios
+            ? "No hay alimentos tuyos. Pasá a «Los míos y el catálogo» para usar los precargados, o cargá uno."
+            : "No hay alimentos. El catálogo de la app se carga al arrancar."
+        : "Nada coincide con esa búsqueda.")</p>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(Model.Q) || !string.IsNullOrWhiteSpace(Model.Tipo))
+    {
+        <p class="muted mini">@Model.Lista.Count de @Model.TotalLista</p>
+    }
+    <div class="tabla-wrap">
+        <table class="datos">
+            <thead>
+                <tr>
+                    <th>Alimento</th>
+                    <th>Porción</th>
+                    <th>kcal</th>
+                    <th>P</th>
+                    <th>C</th>
+                    <th>G</th>
+                    <th>Tramo</th>
+                    <th>Tipo</th>
+                    <th>Origen</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var a in Model.Lista)
+            {
+                var deApp = CatalogoAlimentos.EsDeLaApp(a, Model.UsuarioIdCatalogo);
+                <tr>
+                    <td>@a.Nombre</td>
+                    <td>@a.Porcion</td>
+                    <td class="num">@Redondeo.Kcal(a.Kcal)</td>
+                    <td class="num">@(a.Proteina?.ToString("0.#") ?? "—")</td>
+                    <td class="num">@(a.Carbos?.ToString("0.#") ?? "—")</td>
+                    <td class="num">@(a.Grasa?.ToString("0.#") ?? "—")</td>
+                    <td>@(a.TipoComida?.Nombre ?? "—")</td>
+                    <td>@(a.CategoriaAlimento?.Nombre ?? "—")</td>
+                    <td class="muted">@(deApp ? "app" : Origen(a.Origen))</td>
+                    <td class="fila-acciones">
+                        @if (!deApp)
+                        {
+                            <a class="btn-sec" asp-page="/Alimentos" asp-route-id="@a.Id">Editar</a>
+                            <form method="post" asp-page-handler="Borrar" asp-route-id="@a.Id" class="inline">
+                                <button type="submit" class="btn-borrar">Borrar</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+</div>
+
+<details class="fold-bloque" @(Model.Sugerencias.Count > 0 || Model.ErrorBusqueda is not null ? "open" : null)>
+    <summary>No está en tu lista · buscar afuera</summary>
+    <p class="muted">Open Food Facts. Escribí el producto y, si querés, la cantidad: <b>puré 250 g</b>. Nada se guarda hasta que pulses Usar.</p>
+    <form method="post" asp-page-handler="BuscarCatalogos" class="fila-busca">
+        <input type="hidden" name="Vuelta" value="@Model.Vuelta" />
+        <input type="hidden" name="Filtro" value="@Model.Filtro" />
+        <input type="hidden" name="Q" value="@Model.Q" />
+        <input type="hidden" name="Tipo" value="@Model.Tipo" />
+        <label class="sr" for="ext-q">Buscar afuera</label>
+        <input id="ext-q" type="search" name="Ext" value="@Model.Ext" placeholder="puré 250 g" required />
+        <button type="submit" class="btn-pri">Buscar</button>
+    </form>
+    @if (Model.EstadoFuentes is not null) { <p class="muted mini">@Model.EstadoFuentes</p> }
+    @if (Model.ErrorBusqueda is not null) { <p class="error">@Model.ErrorBusqueda</p> }
+    @if (Model.Sugerencias.Count > 0)
+    {
+        <div class="tabla-wrap">
+            <table class="datos sugerencias">
+                <thead>
+                    <tr>
+                        <th>Alimento</th>
+                        <th>Porción</th>
+                        <th>kcal</th>
+                        <th>P</th>
+                        <th>C</th>
+                        <th>G</th>
+                        <th>Fuente</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var s in Model.Sugerencias)
+                {
+                    var origenRuta = s.Origen switch
+                    {
+                        OrigenDato.Usda => "usda",
+                        OrigenDato.ModeloLenguaje => "ia",
+                        _ => "off"
+                    };
+                    <tr class="@(s.EsEstimacion ? "estimacion" : null)">
+                        <td>
+                            <strong>@s.Nombre</strong>
+                            @if (s.Nota is not null) { <div class="muted mini">@s.Nota</div> }
+                            @if (!string.IsNullOrWhiteSpace(s.Validacion.Detalle))
+                            {
+                                <div class="@(s.Validacion.Nivel == NivelSugerencia.NoConfiable ? "error" : "muted") mini">@s.Validacion.Detalle</div>
+                            }
+                        </td>
+                        <td>@s.Porcion</td>
+                        <td class="num">@Redondeo.Kcal(s.Kcal)</td>
+                        <td class="num">@(s.Proteina is { } pr ? Formato.G(pr) : "—")</td>
+                        <td class="num">@(s.Carbos is { } cb ? Formato.G(cb) : "—")</td>
+                        <td class="num">@(s.Grasa is { } gr ? Formato.G(gr) : "—")</td>
+                        <td class="muted">@s.Fuente@(s.EsEstimacion ? " · estimación" : "")</td>
+                        <td class="fila-acciones">
+                            <a class="btn-sec" asp-page="/Alimentos" asp-route-nuevo="true"
+                               asp-route-nombre="@s.Nombre" asp-route-porcion="@s.Porcion" asp-route-kcal="@s.Kcal"
+                               asp-route-proteina="@s.Proteina" asp-route-carbos="@s.Carbos" asp-route-grasa="@s.Grasa"
+                               asp-route-origen="@origenRuta" asp-route-vuelta="@Model.Vuelta">Usar</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</details>
+
+<details class="fold-bloque">
+    <summary>Importar Excel</summary>
+    <p class="muted">Descargá la plantilla, completá filas (nombre, porción, kcal, macros, tramo y tipo) y subila. Los que ya existan se omiten.</p>
+    <p><a class="btn-sec" asp-page="/Alimentos" asp-page-handler="Plantilla">Descargar plantilla</a></p>
+    <form method="post" asp-page-handler="Importar" enctype="multipart/form-data" class="fila-busca">
+        <input type="hidden" name="Filtro" value="@Model.Filtro" />
+        <input type="hidden" name="Q" value="@Model.Q" />
+        <input type="hidden" name="Tipo" value="@Model.Tipo" />
+        <label class="sr" for="archivo-alimentos">Archivo Excel</label>
+        <input id="archivo-alimentos" type="file" name="Archivo" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" />
+        <button type="submit" class="btn-pri">Importar</button>
+    </form>
+</details>
+</div>
+
+@functions {
+    static string Origen(OrigenDato o) => o switch
+    {
+        OrigenDato.Plantilla => "plantilla",
+        OrigenDato.Manual => "manual",
+        OrigenDato.OpenFoodFacts => "Open Food Facts",
+        OrigenDato.Usda => "USDA",
+        OrigenDato.ModeloLenguaje => "estimación",
+        _ => o.ToString()
+    };
+}

@@ -1,0 +1,161 @@
+@page
+@model KcalTracker.Pages.ObjetivoModel
+@using KcalTracker
+@using KcalTracker.Calculo
+@using KcalTracker.Dominio
+@{
+    ViewData["Title"] = "Objetivo";
+    ViewData["Nav"] = "objetivo";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Objetivo</h1>
+        <p class="lede">@(Model.Deficit is { } m ? $"Ahora: {m.Nombre}. {TextosObjetivo.DetalleTipo(m.Tipo, Model.Medicion?.GrasaPct, Model.Plan?.PctGastoMaxAplicado)}" : "Elegí corte, recomposición o ganancia de músculo: de eso salen la energía del día y la proteína.")</p>
+    </div>
+</div>
+<div class="page-body">
+
+@if (Model.Medicion is { } med)
+{
+    var grasaKg = Composicion.GrasaKg(med.PesoKg, med.GrasaPct);
+    var hayMasNueva = Model.FechaMedicionMasNueva is { } ultima && ultima > med.Fecha;
+    <section class="bloque ref-objetivo">
+        <div class="ref-head">
+            <div>
+                <p class="etiqueta">Medición de referencia</p>
+                <h2>@Formato.FechaCorta(med.Fecha)</h2>
+            </div>
+            <a class="btn-sec" asp-page="/Mediciones">Cambiar</a>
+        </div>
+        <div class="stats">
+            <div class="stat"><div class="l">Peso</div><div class="v">@Formato.Kg(med.PesoKg, 1)<span class="u">kg</span></div></div>
+            <div class="stat"><div class="l">Grasa</div><div class="v">@(med.GrasaPct is { } gp ? gp.ToString("0.#") + " %" : "—")</div></div>
+            <div class="stat">
+                <div class="l">Grasa kg</div>
+                <div class="v">
+                    @if (grasaKg is { } gk)
+                    {
+                        @Formato.Kg(gk)<span class="u">kg</span>
+                    }
+                    else { <text>—</text> }
+                </div>
+            </div>
+            <div class="stat"><div class="l">Músculo</div><div class="v">@(med.MusculoPct is { } mp ? mp.ToString("0.#") + " %" : "—")</div></div>
+        </div>
+        <p class="ayuda">
+            El plan y el gasto basal usan esta pesada@(hayMasNueva ? $", no la del {Formato.FechaCorta(Model.FechaMedicionMasNueva!.Value)}" : "").
+            @if (Model.Bmr?.Kcal is { } bmr)
+            {
+                <text> GER @Formato.Kcal(bmr) kcal@(Model.GastoSinDeporte is { } g ? $" · gasto sin deporte {Formato.Kcal(g)} kcal" : "").</text>
+            }
+            @if (med.EsReferencia && hayMasNueva)
+            {
+                <text> Está marcada como referencia a propósito.</text>
+            }
+            else if (!med.EsReferencia)
+            {
+                <text> Es la más reciente: no hay otra marcada como referencia.</text>
+            }
+        </p>
+        @if (Model.Bmr?.Kcal is null)
+        {
+            <p class="aviso">@(Model.Bmr?.Aviso ?? "Faltan altura, fecha de nacimiento o sexo para estimar el basal. Cargalos en Ajustes, o el GER de la báscula.")</p>
+        }
+        else if (med.GrasaPct is null)
+        {
+            <p class="ayuda">Sin % de grasa el recorte sale del gasto estimado (@Formato.Pct(ValoresDeFabrica.PctDeficitCorte) corte, @Formato.Pct(ValoresDeFabrica.PctDeficitRecomp) recomp, ISSN). Mifflin-St Jeor cubre el GER. El % afina masa magra, techos y proteína.</p>
+        }
+    </section>
+}
+else
+{
+    <p class="aviso">Cargá el <a asp-page="/Mediciones">peso</a>. Con altura, edad, sexo y actividad del día (Ajustes) se estima el gasto. El % de grasa es extra.</p>
+}
+
+<section class="bloque">
+<form method="post" id="form-objetivo" data-live-calc novalidate
+      hx-post="?handler=Recalcular"
+      hx-target="#calculo-objetivo"
+      hx-swap="outerHTML"
+      hx-sync="this:replace"
+      hx-indicator="#calculo-objetivo"
+      hx-validate="false"
+      hx-trigger="change, input changed delay:80ms from:#GrasaObjetivoPct, input changed delay:80ms from:body target:(input[name='PlazoSemanas']), change from:body target:(input[name='PlazoSemanas']), change from:#GrasaObjetivoPct, change from:body target:(input[name='FechaInicioObjetivo']), change from:body target:.fecha-vista, change from:body target:(input[name='TipoObjetivo']), input changed delay:80ms from:body target:(input[name='DeficitDiarioKcal']), change from:body target:(input[name='DeficitDiarioKcal']), input changed delay:80ms from:body target:(input[name='ProteinaObjetivoG']), change from:body target:(input[name='ProteinaObjetivoG'])">
+    <label asp-for="GrasaObjetivoPct">Grasa objetivo (%)</label>
+    <input asp-for="GrasaObjetivoPct" type="number" step="0.1" min="5" max="50" class="corto" id="GrasaObjetivoPct" />
+    <p class="ayuda">Cualquier % entre 5 y 50. Si hay grasa en la medición, el recorte sale de los kilos a perder. Si no, este número no entra: el recorte es un % del gasto.</p>
+    <label asp-for="PlazoSemanas">Plazo (semanas)</label>
+    <div class="campo-fila">
+        <input asp-for="PlazoSemanas" type="number" min="1" step="1" id="PlazoSemanas" class="corto" />
+        @if (Model.Ritmo?.PlazoSugerido is { } n)
+        {
+            <button type="button" class="btn-sec" onclick="var p=document.getElementById('PlazoSemanas'); if(p){ p.value='@n'; p.dispatchEvent(new Event('input',{bubbles:true})); p.dispatchEvent(new Event('change',{bubbles:true})); }">Alargar a @n semanas</button>
+        }
+    </div>
+    <label asp-for="FechaInicioObjetivo">Arranque del plazo</label>
+    <input asp-for="FechaInicioObjetivo" type="date" />
+    <p class="ayuda">El recorte diario se arma el día 0 con el % y las semanas. La fecha de arranque es el reloj (semana X de Y) y el seguimiento; no cambia las kcal al pasar el tiempo. Si cambiás % o semanas, sí se recalcula. Las gráficas de lunes a lunes están en <a asp-page="/Mediciones" asp-route-tab="avance">Mediciones → Avance</a>.</p>
+
+    <partial name="_CalculoObjetivo" model="Model.VistaCalculo" />
+
+    <label asp-for="DeficitDiarioKcal">Otro valor (kcal) <span class="opcional">(opcional)</span></label>
+    <input asp-for="DeficitDiarioKcal" type="number" step="10" min="1" class="corto" />
+    <p class="ayuda">Si lo dejás vacío, usamos el cálculo del objetivo marcado.</p>
+    <label asp-for="ProteinaObjetivoG">Proteína diaria (g)</label>
+    <input asp-for="ProteinaObjetivoG" type="number" step="1" min="1" />
+    @if (Model.Proteina is { } prot)
+    {
+        <p class="ayuda">
+            @if (prot.Tipo == TipoObjetivo.GananciaMusculo)
+            {
+                <text>En ganancia: 1,6–2,2 g/kg de peso.
+                Con @Formato.Kg(prot.PesoKg, 1) kg eso es @Formato.G(prot.MinG)–@Formato.G(prot.MaxG) g.
+                Sugerido: <b>@prot.SugeridaG.ToString("0") g</b> (2,0 g/kg).</text>
+            }
+            else if (prot.UsaMasaMagra)
+            {
+                <text>En corte o recomposición con gym: 2,3–3,1 g/kg de masa magra.
+                Con @Formato.Kg(prot.MasaMagraKg!.Value) kg magros eso es @Formato.G(prot.MinG)–@Formato.G(prot.MaxG) g.
+                Sugerido: <b>@prot.SugeridaG.ToString("0") g</b> (3,0 g/kg magra), para no perder músculo.</text>
+            }
+            else
+            {
+                <text>Sin % de grasa se usa el peso (ISSN 1,6–2,2 g/kg; Helms 1,6–2,4).
+                Con @Formato.Kg(prot.PesoKg, 1) kg eso es @Formato.G(prot.MinG)–@Formato.G(prot.MaxG) g.
+                Sugerido: <b>@prot.SugeridaG.ToString("0") g</b> (2,2 g/kg).</text>
+            }
+        </p>
+        <button type="submit" name="UsarSugerida" value="true" class="btn-sec">Usar @prot.SugeridaG.ToString("0") g</button>
+    }
+    else
+    {
+        <p class="ayuda">Cargá el peso para estimar la proteína (1,6–2,2 g/kg). Mientras tanto podés ponerla a mano.</p>
+    }
+    <div class="form-acciones">
+        <button type="submit" class="btn-pri">Guardar</button>
+    </div>
+</form>
+</section>
+
+<h2>Tu gasto real, calibrado con tus datos</h2>
+@if (Model.Calibrado is { } c)
+{
+    <div class="bloque">
+        <p class="muted">Período @Formato.FechaCorta(c.Desde) → @Formato.FechaCorta(c.Hasta) · @c.Dias días · cobertura @((c.Cobertura * 100).ToString("0")) %</p>
+        <p class="formula">
+            grasa perdida @Formato.Kg(c.GrasaPerdidaKg) kg → @Formato.Kcal(c.GrasaPerdidaKg * (c.EnergiaLiberada == 0 ? 0 : c.EnergiaLiberada / Math.Max(c.GrasaPerdidaKg, 0.0001))) kcal<br />
+            músculo @(c.MusculoGanadoKg >= 0 ? "ganado" : "perdido") @Formato.Kg(Math.Abs(c.MusculoGanadoKg)) kg<br />
+            @(c.GastoRealDiario is { } g ? $"gasto real ≈ {Formato.Kcal(g)} kcal/día" : "hace falta ingesta registrada para estimar el gasto")
+        </p>
+        @if (c.Aviso is not null)
+        {
+            <div class="note">@c.Aviso</div>
+        }
+    </div>
+}
+else
+{
+    <p class="muted">Hacen falta al menos dos mediciones con % de grasa.</p>
+}
+</div>

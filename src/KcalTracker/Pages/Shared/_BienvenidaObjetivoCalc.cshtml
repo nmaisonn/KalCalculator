@@ -1,0 +1,41 @@
+@model KcalTracker.Pages.BienvenidaModel
+@using KcalTracker
+@using KcalTracker.Calculo
+@using KcalTracker.Dominio
+@{
+    var def = Model.Deficit;
+    var porEnergia = Model.Plan is not { UsaComposicion: true };
+    var grasa = Model.GrasaPct;
+    string Extra(double techo, bool superavit = false)
+    {
+        if (techo <= 0) return "";
+        var rec = (superavit ? " · techo +" : " · techo ") + Formato.Kcal(techo);
+        if (superavit || porEnergia || def is not { Necesario: > 0 }) return rec;
+        return rec + $" · necesario {Formato.Kcal(def.Necesario)}";
+    }
+}
+<div id="bienvenida-objetivo-calc">
+    <p class="etiqueta">Qué buscás</p>
+    <label class="opcion">
+        <input type="radio" asp-for="TipoObjetivo" value="Corte" />
+        <span>Corte
+            <span class="muted">@TextosObjetivo.TechoCorte(grasa, porEnergia, Model.Plan?.PctGastoMaxAplicado)@(Extra(porEnergia ? def?.Corte ?? 0 : def?.TopeCorte > 0 ? def.TopeCorte : def?.Corte ?? 0))</span>
+        </span>
+    </label>
+    <label class="opcion">
+        <input type="radio" asp-for="TipoObjetivo" value="Recomposicion" />
+        <span>Recomposición
+            <span class="muted">@TextosObjetivo.TechoRecomp(grasa, porEnergia, Model.Plan?.PctGastoMaxAplicado)@(Extra(porEnergia ? def?.Recomposicion ?? 0 : def?.TopeRecomp > 0 ? def.TopeRecomp : def?.Recomposicion ?? 0))</span>
+        </span>
+    </label>
+    <label class="opcion">
+        <input type="radio" asp-for="TipoObjetivo" value="GananciaMusculo" />
+        <span>Ganancia de músculo
+            <span class="muted">@TextosObjetivo.TechoGanancia(grasa, porEnergia)@(Extra(def?.Ganancia ?? 0, true))</span>
+        </span>
+    </label>
+    @if (Model.Alcance is { } al)
+    {
+        <partial name="_AlcanceNota" model="al" />
+    }
+</div>

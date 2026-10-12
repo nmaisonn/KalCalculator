@@ -1,0 +1,28 @@
+@model KcalTracker.Calculo.ResultadoAlcance
+@using KcalTracker.Calculo
+@using KcalTracker.Dominio
+<div class="note @Model.Clase">
+    <p><b>@Model.Titulo.</b> @Model.Texto</p>
+    @if (Model.Cuenta is { Length: > 0 } cuenta)
+    {
+        <p class="alcance-cuenta">@cuenta</p>
+    }
+    @if ((ViewData["AlcanceAcciones"] as bool?) != false
+         && (Model.PlazoSugerido is not null || Model.TipoSugerido is not null || Model.PctSugerido is not null))
+    {
+        <div class="campo-fila">
+            @if (Model.PlazoSugerido is { } n)
+            {
+                <button type="button" class="btn-sec" onclick="var p=document.getElementById('PlazoSemanas'); if(p){ p.value='@n'; p.dispatchEvent(new Event('input',{bubbles:true})); p.dispatchEvent(new Event('change',{bubbles:true})); }">Alargar a @n semanas</button>
+            }
+            @if (Model.TipoSugerido is { } tipoSug)
+            {
+                <button type="button" class="btn-sec" onclick="var r=document.querySelector('[name=TipoObjetivo][value=@tipoSug]'); if(r){ r.checked=true; r.dispatchEvent(new Event('change',{bubbles:true})); }">Usar @TipoObjetivoNombres.De(tipoSug).ToLower()</button>
+            }
+            @if (Model.PctSugerido is { } pctSug)
+            {
+                <button type="button" class="btn-sec" onclick="var s=document.getElementById('GrasaObjetivoPct'); if(s){ s.value='@pctSug'; s.dispatchEvent(new Event('input',{bubbles:true})); s.dispatchEvent(new Event('change',{bubbles:true})); }">Apuntar a @pctSug %</button>
+            }
+        </div>
+    }
+</div>

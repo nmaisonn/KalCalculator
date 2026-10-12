@@ -1,0 +1,24 @@
+@page
+@model KcalTracker.Pages.IngresoModel
+@{
+    ViewData["Title"] = "Ingresar";
+}
+
+<div class="tarjeta-angosta">
+    <h1>Entrar</h1>
+    <p>Cargá tu día más rápido que en la planilla.</p>
+
+    <form method="post">
+        <div asp-validation-summary="All" class="error"></div>
+
+        <label asp-for="Email">Correo</label>
+        <input asp-for="Email" type="email" autocomplete="username" autofocus />
+
+        <label asp-for="Clave">Contraseña</label>
+        <input asp-for="Clave" type="password" autocomplete="current-password" />
+
+        <button type="submit" class="btn-pri">Ingresar</button>
+    </form>
+
+    <p class="auth-pie">¿Primera vez? <a asp-page="/Registro">Crear una cuenta</a></p>
+</div>

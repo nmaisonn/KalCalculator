@@ -1,0 +1,51 @@
+# Build
+bin/
+obj/
+out/
+artifacts/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.rsuser
+.vs/
+.idea/
+*.DotSettings.user
+
+# SQLite: el historial va en data/kcal.db; WAL y copias sueltas no
+*.db
+*.db-shm
+*.db-wal
+!/data/kcal.db
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Secrets y entorno
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+appsettings.Production.json
+secrets.json
+*.pfx
+
+# Cobertura / tests
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Herramientas locales
+.cursor/
+.vscode/
+*.log
+
+# Python del inventario en docs/anexos
+__pycache__/
+*.py[cod]
+.venv/
+venv/

@@ -1,0 +1,205 @@
+@page
+@model KcalTracker.Pages.CardioModel
+@using KcalTracker
+@using KcalTracker.Calculo
+@{
+    ViewData["Title"] = "Cardio";
+    ViewData["Nav"] = "cardio";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Cardio</h1>
+        <p class="lede">Caminatas, cinta e intervalos. Nombre, tiempo y kcal, y los marcás en Hoy.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn-pri" asp-page="/Cardio" asp-route-nuevo="true">+ Nuevo</a>
+    </div>
+</div>
+<div class="page-body">
+@if (Model.Mensaje is not null) { <p class="ok">@Model.Mensaje</p> }
+@if (Model.Error is not null) { <p class="error">@Model.Error</p> }
+
+@if (Model.Editando)
+{
+    <section class="bloque">
+        <h2>@(Model.ProtoId == 0 ? "Nuevo cardio" : "Editar cardio")</h2>
+        <form method="post" asp-page-handler="Protocolo">
+            <input type="hidden" asp-for="ProtoId" />
+            <input type="hidden" asp-for="Vuelta" />
+            @if (!string.IsNullOrEmpty(Model.Vuelta))
+            {
+                <p class="aviso">Al guardar volvés al día desde el que viniste.</p>
+            }
+            <div class="form-grid">
+                <div>
+                    <label>Nombre</label>
+                    <input asp-for="ProtoNombre" placeholder="Caminata 40 min" />
+                </div>
+                <div>
+                    <label>Descripción</label>
+                    <input asp-for="ProtoDescripcion" placeholder="Opcional" />
+                </div>
+                <div>
+                    <label>Minutos</label>
+                    <input asp-for="ProtoMinutos" type="number" step="0.1" class="corto" />
+                </div>
+                <div>
+                    <label>kcal</label>
+                    <input asp-for="ProtoKcal" type="number" step="1" class="corto" />
+                </div>
+            </div>
+            <div class="ajuste-cta">
+                <button type="submit" class="btn-pri">Guardar</button>
+                @if (!string.IsNullOrEmpty(Model.Vuelta))
+                {
+                    <a class="btn-sec" href="@Model.Vuelta">Cancelar</a>
+                }
+                else
+                {
+                    <a class="btn-sec" asp-page="/Cardio">Cancelar</a>
+                }
+                @if (Model.ProtoId != 0)
+                {
+                    <button type="submit" formaction="@Url.Page("/Cardio", "BorrarProtocolo", new { id = Model.ProtoId })" class="btn-peligro" formnovalidate>Desactivar</button>
+                }
+            </div>
+        </form>
+    </section>
+}
+
+@if (Model.Lista.Count == 0 && !Model.Editando)
+{
+    <section class="bloque">
+        <p class="muted" style="margin:0">No hay cardio. Cargá una caminata o un protocolo de cinta.</p>
+        <div class="ajuste-cta">
+            <a class="btn-pri" asp-page="/Cardio" asp-route-nuevo="true">+ Nuevo</a>
+        </div>
+    </section>
+}
+else if (Model.Lista.Count > 0)
+{
+    <div class="tabla-wrap">
+        <table class="datos">
+            <thead>
+                <tr><th>Cardio</th><th>Min</th><th>kcal</th><th>Sesiones</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var f in Model.Lista)
+            {
+                <tr>
+                    <td>
+                        @f.Protocolo.Nombre
+                        @if (!string.IsNullOrWhiteSpace(f.Protocolo.Descripcion))
+                        {
+                            <div class="muted mini">@f.Protocolo.Descripcion</div>
+                        }
+                    </td>
+                    <td>@f.Minutos.ToString("0.#")</td>
+                    <td>@(f.KcalEst > 0 ? Formato.Kcal(f.KcalEst) : "—")</td>
+                    <td>@(f.Sesiones == 0 ? "—" : f.Sesiones.ToString())</td>
+                    <td class="fila-acciones">
+                        <a class="btn-sec" asp-page="/Cardio" asp-route-id="@f.Protocolo.Id">Editar</a>
+                        <form method="post" asp-page-handler="BorrarProtocolo" asp-route-id="@f.Protocolo.Id" class="inline">
+                            <button type="submit" class="btn-borrar">Borrar</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <p class="muted">Editar no cambia las sesiones ya registradas. En Hoy las marcás el día que las hiciste.</p>
+}
+
+<details class="fold-bloque" @(Model.ProtocoloId is > 0 ? "open" : null)>
+    <summary>Sesión suelta (sin catálogo)</summary>
+    <p class="ayuda">Si no está en la lista. Lo de todos los días se marca en Hoy.</p>
+    <form method="post" asp-page-handler="Guardar">
+        <div class="form-grid">
+            <div>
+                <label>Fecha</label>
+                <input asp-for="Fecha" type="date" class="corto" />
+            </div>
+            <div>
+                <label>Del catálogo (opcional)</label>
+                <select asp-for="ProtocoloId">
+                    <option value="">Ninguno</option>
+                    @foreach (var f in Model.Lista)
+                    {
+                        <option value="@f.Protocolo.Id">@f.Protocolo.Nombre · @f.Minutos.ToString("0.#") min</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label>Minutos</label>
+                <input asp-for="Minutos" type="number" step="0.1" class="corto" />
+            </div>
+            <div>
+                <label>Velocidad (km/h)</label>
+                <input asp-for="Velocidad" type="number" step="0.1" class="corto" />
+            </div>
+            <div>
+                <label>Inclinación (%)</label>
+                <input asp-for="Inclinacion" type="number" step="0.1" class="corto" />
+            </div>
+            <div>
+                <label>kcal</label>
+                <input asp-for="Kcal" type="number" step="1" class="corto" />
+            </div>
+            <div class="span-2">
+                <label>o rango min–max</label>
+                <div class="campo-fila">
+                    <input asp-for="KcalMin" type="number" step="1" class="corto" placeholder="mín" />
+                    <input asp-for="KcalMax" type="number" step="1" class="corto" placeholder="máx" />
+                </div>
+            </div>
+            <div class="span-2">
+                <label>Nota</label>
+                <input asp-for="Nota" />
+            </div>
+        </div>
+        <div class="ajuste-cta">
+            <button type="submit" class="btn-pri">Guardar sesión</button>
+        </div>
+    </form>
+</details>
+
+<section class="bloque">
+    <h2>Sesiones</h2>
+    @if (Model.Sesiones.Count == 0)
+    {
+        <p class="muted" style="margin:0">Todavía no hay sesiones.</p>
+    }
+    else
+    {
+        <div class="tabla-wrap">
+            <table class="datos">
+                <thead><tr><th>Fecha</th><th>Qué</th><th>Min</th><th>kcal</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var s in Model.Sesiones)
+                {
+                    <tr>
+                        <td>@Formato.FechaCorta(s.Fecha)</td>
+                        <td>@(s.Protocolo?.Nombre ?? s.Nota ?? "—")</td>
+                        <td>@s.Minutos.ToString("0.#")</td>
+                        <td>
+                            @Formato.Kcal(s.Kcal)
+                            @if (s.KcalMin is not null && s.KcalMax is not null)
+                            {
+                                <span class="muted">(rango @s.KcalMin–@s.KcalMax, se usa el medio)</span>
+                            }
+                        </td>
+                        <td class="fila-acciones">
+                            <form method="post" asp-page-handler="Borrar" asp-route-id="@s.Id" class="inline">
+                                <button type="submit" class="btn-borrar">Borrar</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+</div>

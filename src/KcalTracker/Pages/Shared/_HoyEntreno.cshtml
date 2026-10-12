@@ -1,0 +1,363 @@
+@model IndexModel
+@using KcalTracker
+@using KcalTracker.Calculo
+@{
+    var v = Model.Vista;
+    var b = v.Balance;
+    var fechaIso = Model.Fecha.ToString("yyyy-MM-dd");
+    var vuelta = Url.Page("/Index", new { Fecha = fechaIso })!;
+    var gymSel = v.DiasRutina.Where(diaR => v.SesionesGymDelDia.Contains(diaR.Id)).ToList();
+    var cardioSel = v.Protocolos.Where(pr => v.CardioDelDia.Contains(pr.Id)).ToList();
+    var deporteSel = v.Actividades.Where(act => v.ActividadesDelDia.Contains(act.Id)).ToList();
+    var swap = "outerHTML show:none focus-scroll:false";
+}
+
+<div class="entreno" id="entreno">
+    @if (Model.Error is not null)
+    {
+        <div class="callout-row callout-error"><div class="t">@Model.Error</div></div>
+    }
+    <div class="spread-mini" style="margin-bottom:12px">
+        <h2 style="margin:0">Entrenamiento</h2>
+        <span class="muted mini">El % es la porción hecha. 100 es completo; 50 deja la mitad.</span>
+    </div>
+
+    <div class="entreno-grid">
+        <div class="entreno-grupo gym">
+            <div class="entreno-cabeza">
+                <h3>Gym</h3>
+                <div class="entreno-acciones">
+                    <button type="button" class="btn-sec" data-abrir-puntual
+                            data-handler="KcalGym"
+                            data-hx-target="#entreno"
+                            data-titulo="Agregar gym"
+                            data-ayuda="No se guarda en ejercicios ni rutinas. Solo entra en este día.">Agregar</button>
+                    <a class="chip add" asp-page="/Rutinas" asp-route-vuelta="@vuelta" title="Abrir rutinas">+</a>
+                </div>
+            </div>
+            @if (v.DiasRutina.Count == 0)
+            {
+                <p class="muted mini">No hay rutina activa. <a asp-page="/Rutinas" asp-route-vuelta="@vuelta">Crear o importar</a>, o agregá uno puntual.</p>
+            }
+            else
+            {
+                <ul class="opt-list">
+                @foreach (var diaR in v.DiasRutina)
+                {
+                    var on = v.SesionesGymDelDia.Contains(diaR.Id);
+                    var marcaGym = v.GymMarcas.FirstOrDefault(m => m.Id == diaR.Id);
+                    var kcalGym = marcaGym?.Kcal > 0 ? marcaGym.Kcal : diaR.KcalEstimadas ?? 0;
+                    var cantGym = marcaGym?.Cantidad ?? 1;
+                    <li class="opt">
+                        <form method="post" asp-page-handler="Rutina"
+                              hx-post="?handler=Rutina" hx-target="#entreno" hx-swap="@swap">
+                            <input type="hidden" name="Fecha" value="@fechaIso" />
+                            <input type="hidden" name="rutinaDiaId" value="@diaR.Id" />
+                            <button type="submit" class="mark @(on ? "on" : "")">
+                                <span class="row" style="margin:0;gap:8px">
+                                    <span class="dot"></span>
+                                    <span>@diaR.Nombre</span>
+                                </span>
+                                <span class="k">@(kcalGym > 0 ? Formato.Kcal(kcalGym) + " kcal" : "—")@(Math.Abs(cantGym - 1) > 0.02 ? " · " + FraccionHecha.Porcentaje(cantGym) + "%" : "")</span>
+                            </button>
+                        </form>
+                        @if (on)
+                        {
+                            <div class="opt-links">
+                                <partial name="_FraccionHecha" model="VistaFraccion.Gym(fechaIso, diaR.Id, cantGym)" />
+                                <a asp-page="/Sesion" asp-route-dia="@diaR.Id" asp-route-fecha="@fechaIso">Sesión</a>
+                                <form method="post" asp-page-handler="Rutina" class="inline"
+                                      hx-post="?handler=Rutina" hx-target="#entreno" hx-swap="@swap">
+                                    <input type="hidden" name="Fecha" value="@fechaIso" />
+                                    <input type="hidden" name="rutinaDiaId" value="@diaR.Id" />
+                                    <button type="submit" class="peligro-txt">Quitar</button>
+                                </form>
+                            </div>
+                        }
+                    </li>
+                }
+                </ul>
+            }
+            @if (v.GymSueltos.Count > 0)
+            {
+                <ul class="opt-list">
+                @foreach (var s in v.GymSueltos)
+                {
+                    <li class="opt">
+                        <div class="mark on">
+                            <span class="row" style="margin:0;gap:8px"><span class="dot"></span><span>@s.Nombre</span></span>
+                            <span class="k">@Formato.Kcal(s.Kcal) kcal</span>
+                        </div>
+                        <div class="opt-links">
+                            <form method="post" asp-page-handler="QuitarGymSuelto" class="inline"
+                                  hx-post="?handler=QuitarGymSuelto" hx-target="#entreno" hx-swap="@swap">
+                                <input type="hidden" name="Fecha" value="@fechaIso" />
+                                <input type="hidden" name="sesionId" value="@s.Id" />
+                                <button type="submit" class="peligro-txt">Quitar</button>
+                            </form>
+                        </div>
+                    </li>
+                }
+                </ul>
+            }
+        </div>
+
+        <div class="entreno-grupo cardio">
+            <div class="entreno-cabeza">
+                <h3>Cardio</h3>
+                <div class="entreno-acciones">
+                    <button type="button" class="btn-sec" data-abrir-puntual
+                            data-handler="KcalCardio"
+                            data-hx-target="#entreno"
+                            data-titulo="Agregar cardio"
+                            data-ayuda="No se guarda en protocolos. Solo entra en este día.">Agregar</button>
+                    <a class="chip add" asp-page="/Cardio" asp-route-nuevo="true" asp-route-vuelta="@vuelta" title="Alta de cardio">+</a>
+                </div>
+            </div>
+            @if (v.Protocolos.Count == 0)
+            {
+                <p class="muted mini">Ningún cardio. El + abre el alta (nombre, minutos y kcal), o agregá uno puntual.</p>
+            }
+            else
+            {
+                <ul class="opt-list">
+                @foreach (var proto in v.Protocolos)
+                {
+                    var on = v.CardioDelDia.Contains(proto.Id);
+                    var marcaCardio = v.CardioMarcas.FirstOrDefault(m => m.Id == proto.Id);
+                    var kcalProto = marcaCardio is { Kcal: > 0 }
+                        ? marcaCardio.Kcal
+                        : Redondeo.Kcal(EstimacionCardio.DeProtocolo(proto, v.Medicion?.PesoKg ?? 70));
+                    var cantCardio = marcaCardio?.Cantidad ?? 1;
+                    <li class="opt">
+                        <form method="post" asp-page-handler="Cardio"
+                              hx-post="?handler=Cardio" hx-target="#entreno" hx-swap="@swap">
+                            <input type="hidden" name="Fecha" value="@fechaIso" />
+                            <input type="hidden" name="protocoloId" value="@proto.Id" />
+                            <button type="submit" class="mark @(on ? "on" : "")">
+                                <span class="row" style="margin:0;gap:8px">
+                                    <span class="dot"></span>
+                                    <span>@proto.Nombre</span>
+                                </span>
+                                <span class="k">@Formato.Kcal(kcalProto) kcal@(Math.Abs(cantCardio - 1) > 0.02 && on ? " · " + FraccionHecha.Porcentaje(cantCardio) + "%" : "")</span>
+                            </button>
+                        </form>
+                        @if (on)
+                        {
+                            <div class="opt-links">
+                                <partial name="_FraccionHecha" model="VistaFraccion.Cardio(fechaIso, proto.Id, cantCardio)" />
+                                <a asp-page="/Cardio" asp-route-editarProtocolo="@proto.Id" asp-route-vuelta="@vuelta">Editar</a>
+                                <form method="post" asp-page-handler="Cardio" class="inline"
+                                      hx-post="?handler=Cardio" hx-target="#entreno" hx-swap="@swap">
+                                    <input type="hidden" name="Fecha" value="@fechaIso" />
+                                    <input type="hidden" name="protocoloId" value="@proto.Id" />
+                                    <button type="submit" class="peligro-txt">Quitar</button>
+                                </form>
+                            </div>
+                        }
+                    </li>
+                }
+                </ul>
+            }
+            @if (v.CardioSueltos.Count > 0)
+            {
+                <ul class="opt-list">
+                @foreach (var s in v.CardioSueltos)
+                {
+                    <li class="opt">
+                        <div class="mark on">
+                            <span class="row" style="margin:0;gap:8px"><span class="dot"></span><span>@s.Nombre</span></span>
+                            <span class="k">@Formato.Kcal(s.Kcal) kcal</span>
+                        </div>
+                        <div class="opt-links">
+                            <form method="post" asp-page-handler="QuitarCardioSuelto" class="inline"
+                                  hx-post="?handler=QuitarCardioSuelto" hx-target="#entreno" hx-swap="@swap">
+                                <input type="hidden" name="Fecha" value="@fechaIso" />
+                                <input type="hidden" name="sesionId" value="@s.Id" />
+                                <button type="submit" class="peligro-txt">Quitar</button>
+                            </form>
+                        </div>
+                    </li>
+                }
+                </ul>
+            }
+        </div>
+
+        <div class="entreno-grupo deporte">
+            <div class="entreno-cabeza">
+                <h3>Deporte y otras</h3>
+                <div class="entreno-acciones">
+                    <button type="button" class="btn-sec" data-abrir-puntual
+                            data-handler="KcalDeporte"
+                            data-hx-target="#entreno"
+                            data-titulo="Agregar deporte"
+                            data-ayuda="No se guarda en actividades. Solo entra en este día.">Agregar</button>
+                    <a class="chip add" asp-page="/Actividad" asp-route-nueva="true" asp-route-vuelta="@vuelta" title="Alta de actividad">+</a>
+                </div>
+            </div>
+            @if (v.Actividades.Count == 0)
+            {
+                <p class="muted mini">Ninguna actividad. El + abre el alta, o agregá uno puntual.</p>
+            }
+            else
+            {
+                <ul class="opt-list">
+                @foreach (var a in v.Actividades)
+                {
+                    var on = v.ActividadesDelDia.Contains(a.Id);
+                    var marcaDep = v.DeporteMarcas.FirstOrDefault(m => m.Id == a.Id);
+                    var kcalDep = marcaDep is { Kcal: > 0 } ? marcaDep.Kcal : a.Kcal;
+                    var cantDep = marcaDep?.Cantidad ?? 1;
+                    <li class="opt">
+                        <form method="post" asp-page-handler="Actividad"
+                              hx-post="?handler=Actividad" hx-target="#entreno" hx-swap="@swap">
+                            <input type="hidden" name="Fecha" value="@fechaIso" />
+                            <input type="hidden" name="actividadId" value="@a.Id" />
+                            <button type="submit" class="mark @(on ? "on" : "")">
+                                <span class="row" style="margin:0;gap:8px">
+                                    <span class="dot"></span>
+                                    <span>@a.Nombre</span>
+                                </span>
+                                <span class="k">@Formato.Kcal(kcalDep) kcal@(Math.Abs(cantDep - 1) > 0.02 && on ? " · " + FraccionHecha.Porcentaje(cantDep) + "%" : "")</span>
+                            </button>
+                        </form>
+                        @if (on)
+                        {
+                            <div class="opt-links">
+                                <partial name="_FraccionHecha" model="VistaFraccion.Actividad(fechaIso, a.Id, cantDep)" />
+                                <a asp-page="/Actividad" asp-route-id="@a.Id" asp-route-vuelta="@vuelta">Editar</a>
+                                <form method="post" asp-page-handler="Actividad" class="inline"
+                                      hx-post="?handler=Actividad" hx-target="#entreno" hx-swap="@swap">
+                                    <input type="hidden" name="Fecha" value="@fechaIso" />
+                                    <input type="hidden" name="actividadId" value="@a.Id" />
+                                    <button type="submit" class="peligro-txt">Quitar</button>
+                                </form>
+                            </div>
+                        }
+                    </li>
+                }
+                </ul>
+            }
+            @if (v.DeporteSueltos.Count > 0)
+            {
+                <ul class="opt-list">
+                @foreach (var s in v.DeporteSueltos)
+                {
+                    <li class="opt">
+                        <div class="mark on">
+                            <span class="row" style="margin:0;gap:8px"><span class="dot"></span><span>@s.Nombre</span></span>
+                            <span class="k">@Formato.Kcal(s.Kcal) kcal</span>
+                        </div>
+                        <div class="opt-links">
+                            <form method="post" asp-page-handler="QuitarDeporteSuelto" class="inline"
+                                  hx-post="?handler=QuitarDeporteSuelto" hx-target="#entreno" hx-swap="@swap">
+                                <input type="hidden" name="Fecha" value="@fechaIso" />
+                                <input type="hidden" name="logId" value="@s.Id" />
+                                <button type="submit" class="peligro-txt">Quitar</button>
+                            </form>
+                        </div>
+                    </li>
+                }
+                </ul>
+            }
+        </div>
+    </div>
+
+    @if (v.Bmr?.Kcal is { } bmrK && v.GastoSinDeporte is { } gs)
+    {
+        var cotidiano = gs - bmrK;
+        <section class="desglose">
+            <h3>Desglose del gasto</h3>
+            <div class="cuenta-grid">
+                <div class="cuenta">
+                    <div class="linea">
+                        <span class="lab"><span class="op"></span>Basal (@Metabolismo.Etiqueta(v.Bmr.Aplicado))<span class="hint">@Formato.Kcal(bmrK) kcal · @Metabolismo.Formula(v.Bmr.Aplicado, v.Medicion is { } medBmr ? Composicion.MagraKg(medBmr.PesoKg, medBmr.GrasaPct) : null)</span></span>
+                        <span class="val">@Formato.Kcal(bmrK)</span>
+                    </div>
+                    <div class="linea">
+                        <span class="lab"><span class="op gris"></span>Cotidiano<span class="hint">× @Formato.Factor(v.FactorActividad) sentado</span></span>
+                        <span class="val">+ @Formato.Kcal(cotidiano)</span>
+                    </div>
+                    @foreach (var diaR in gymSel)
+                    {
+                        var marcaGym = v.GymMarcas.FirstOrDefault(m => m.Id == diaR.Id);
+                        <div class="linea">
+                            <span class="lab"><span class="op verde"></span>Gym — @diaR.Nombre@(marcaGym is { } mg && Math.Abs(mg.Cantidad - 1) > 0.01 ? $" × {mg.Cantidad.ToString("0.##")}" : "")</span>
+                            <span class="val">+ @Formato.Kcal(marcaGym?.Kcal ?? diaR.KcalEstimadas ?? 0)</span>
+                        </div>
+                    }
+                    @foreach (var s in v.GymSueltos)
+                    {
+                        <div class="linea">
+                            <span class="lab"><span class="op verde"></span>Gym — @s.Nombre</span>
+                            <span class="val">+ @Formato.Kcal(s.Kcal)</span>
+                        </div>
+                    }
+                    @if (gymSel.Count == 0 && v.GymSueltos.Count == 0 && b.Gasto.Gym > 0)
+                    {
+                        <div class="linea">
+                            <span class="lab"><span class="op verde"></span>Gym</span>
+                            <span class="val">+ @Formato.Kcal(b.Gasto.Gym)</span>
+                        </div>
+                    }
+                    @if (cardioSel.Count > 0)
+                    {
+                        <div class="linea">
+                            <span class="lab"><span class="op azul"></span>Cardio — @string.Join(", ", cardioSel.Select(p => p.Nombre))</span>
+                            <span class="val">+ @Formato.Kcal(v.CardioMarcas.Sum(m => m.Kcal))</span>
+                        </div>
+                    }
+                    @foreach (var s in v.CardioSueltos)
+                    {
+                        <div class="linea">
+                            <span class="lab"><span class="op azul"></span>Cardio — @s.Nombre</span>
+                            <span class="val">+ @Formato.Kcal(s.Kcal)</span>
+                        </div>
+                    }
+                    @if (cardioSel.Count == 0 && v.CardioSueltos.Count == 0 && b.Gasto.Cardio > 0)
+                    {
+                        <div class="linea">
+                            <span class="lab"><span class="op azul"></span>Cardio</span>
+                            <span class="val">+ @Formato.Kcal(b.Gasto.Cardio)</span>
+                        </div>
+                    }
+                    @foreach (var act in deporteSel)
+                    {
+                        var marcaDep = v.DeporteMarcas.FirstOrDefault(m => m.Id == act.Id);
+                        <div class="linea">
+                            <span class="lab"><span class="op naranja"></span>Deporte — @act.Nombre</span>
+                            <span class="val">+ @Formato.Kcal(marcaDep?.Kcal ?? act.Kcal)</span>
+                        </div>
+                    }
+                    @foreach (var s in v.DeporteSueltos)
+                    {
+                        <div class="linea">
+                            <span class="lab"><span class="op naranja"></span>Deporte — @s.Nombre</span>
+                            <span class="val">+ @Formato.Kcal(s.Kcal)</span>
+                        </div>
+                    }
+                    @if (deporteSel.Count == 0 && v.DeporteSueltos.Count == 0 && b.Gasto.Actividades > 0)
+                    {
+                        <div class="linea">
+                            <span class="lab"><span class="op naranja"></span>Deporte</span>
+                            <span class="val">+ @Formato.Kcal(b.Gasto.Actividades)</span>
+                        </div>
+                    }
+                    <div class="linea total">
+                        <span>Gasto del día</span>
+                        <span class="val">@Formato.Kcal(b.Gasto.Total) kcal</span>
+                    </div>
+                </div>
+                <div class="nota-gasto">
+                    <p>El factor @Formato.Factor(v.FactorActividad) cubre <strong>solo lo sentado</strong>. Gym, cinta y deporte se suman en bruto, aparte.</p>
+                    <p>El @Metabolismo.Etiqueta(v.Bmr.Aplicado) no es el gasto del día: es el punto de partida.</p>
+                </div>
+            </div>
+        </section>
+    }
+</div>
+@if (Context.Request.Headers.ContainsKey("HX-Request"))
+{
+    <partial name="_HoyHero" />
+    <partial name="_HoyDeficitMini" />
+}

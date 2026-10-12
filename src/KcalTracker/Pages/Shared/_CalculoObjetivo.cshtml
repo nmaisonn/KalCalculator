@@ -1,0 +1,185 @@
+@model KcalTracker.Pages.VistaCalculoObjetivo
+@using KcalTracker
+@using KcalTracker.Calculo
+@using KcalTracker.Dominio
+<div id="calculo-objetivo">
+    <p class="etiqueta">Tu objetivo</p>
+    @{
+        var def = Model.Deficit;
+        var porEnergia = Model.Plan is not { UsaComposicion: true };
+        var falta = !porEnergia && def is { Necesario: > 0 };
+        var grasa = Model.GrasaActualPct;
+    }
+    <label class="opcion-fila">
+        <input type="radio" name="TipoObjetivo" value="Corte" checked="@(Model.TipoObjetivo == TipoObjetivo.Corte)" />
+        <span class="txt"><strong>Corte</strong>
+            <span class="muted">@TextosObjetivo.TechoCorte(grasa, porEnergia, Model.Plan?.PctGastoMaxAplicado)</span>
+        </span>
+        <span class="kcal-op">
+            @if (def is { TopeCorte: > 0 } || def is { Corte: > 0 })
+            {
+                <span class="kcal-linea"><span class="kcal-lab">techo</span> @Formato.Kcal(def!.TopeCorte > 0 ? def.TopeCorte : def.Corte)</span>
+            }
+            @if (falta)
+            {
+                <span class="kcal-linea"><span class="kcal-lab">necesario</span> @Formato.Kcal(def!.Necesario)</span>
+            }
+        </span>
+    </label>
+    <label class="opcion-fila">
+        <input type="radio" name="TipoObjetivo" value="Recomposicion" checked="@(Model.TipoObjetivo == TipoObjetivo.Recomposicion)" />
+        <span class="txt"><strong>Recomposición</strong>
+            <span class="muted">@TextosObjetivo.TechoRecomp(grasa, porEnergia, Model.Plan?.PctGastoMaxAplicado)</span>
+        </span>
+        <span class="kcal-op">
+            @if (def is { TopeRecomp: > 0 } || def is { Recomposicion: > 0 })
+            {
+                <span class="kcal-linea"><span class="kcal-lab">techo</span> @Formato.Kcal(def!.TopeRecomp > 0 ? def.TopeRecomp : def.Recomposicion)</span>
+            }
+            @if (falta)
+            {
+                <span class="kcal-linea"><span class="kcal-lab">necesario</span> @Formato.Kcal(def!.Necesario)</span>
+            }
+        </span>
+    </label>
+    <label class="opcion-fila">
+        <input type="radio" name="TipoObjetivo" value="GananciaMusculo" checked="@(Model.TipoObjetivo == TipoObjetivo.GananciaMusculo)" />
+        <span class="txt"><strong>Ganancia de músculo</strong>
+            <span class="muted">@TextosObjetivo.TechoGanancia(grasa, porEnergia)</span>
+        </span>
+        <span class="kcal-op">
+            @if (def is { Ganancia: > 0 })
+            {
+                <span class="kcal-linea"><span class="kcal-lab">techo</span> +@Formato.Kcal(def.Ganancia)</span>
+            }
+        </span>
+    </label>
+    <p class="ayuda">El techo sale de tu gasto cotidiano (GER × actividad) y de tu % de grasa (Helms/ACSM), o del valor que hayas puesto en Ajustes. El necesario sale del % objetivo y las semanas, fijado el día 0.</p>
+
+    @if (Model.Alcance is { } al)
+    {
+        <partial name="_AlcanceNota" model="al" />
+    }
+
+    @if (Model.Seguimiento is { } seg)
+    {
+        <div class="note @seg.Clase">
+            <p><b>@seg.Titulo.</b> @seg.Texto</p>
+        </div>
+    }
+
+    @if (Model.Ritmo is not null && Model.Alcance is null)
+    {
+        var diario = Model.Deficit?.Diario ?? Model.Plan?.DeficitDiario ?? 0;
+        var techo = Model.Plan?.TechoDiario ?? 0;
+        var excede = Model.Deficit is not { EsSuperavit: true } && techo > 0 && diario > techo + 0.5;
+        var lento = Model.Ritmo?.VaMasLento == true;
+        var cls = excede ? "bad" : lento ? "" : Model.Plan is not null ? "ok" : "";
+        <div class="note @cls">
+            @if (Model.Ritmo is { } r)
+            {
+                <p>@r.Texto</p>
+            }
+        </div>
+    }
+    else if (Model.Ritmo is { } ritmo && Model.Alcance is not null)
+    {
+        <p class="ayuda">@ritmo.Texto</p>
+    }
+
+    @if (Model.Plan is { } p)
+    {
+        if (p.UsaComposicion && p.GrasaAPerderKg <= 0 && Model.TipoObjetivo != TipoObjetivo.GananciaMusculo && Model.Alcance is null)
+        {
+            <div class="note ok"><b>Objetivo alcanzado.</b> Ya estás en o por debajo del @Model.GrasaObjetivoPct.ToString("0") % de grasa.</div>
+        }
+        else if (p.UsaComposicion)
+        {
+            <div class="stats">
+                <div class="stat"><div class="l">Peso al llegar</div><div class="v">@Formato.Kg(p.PesoObjetivoKg, 1)<span class="u">kg</span></div></div>
+                <div class="stat"><div class="l">Grasa a perder</div><div class="v">@Formato.Kg(p.GrasaAPerderKg)<span class="u">kg</span></div></div>
+                <div class="stat"><div class="l">kcal totales</div><div class="v">@Formato.Kcal(p.KcalTotales)</div></div>
+                <div class="stat"><div class="l">@(def?.Etiqueta ?? "Déficit diario")</div><div class="v @(def is { EsSuperavit: true } || (def?.Diario ?? p.DeficitDiario) <= p.TechoDiario + 0.5 ? "ok" : "bad")">@Formato.Kcal(def?.Diario ?? p.DeficitDiario)</div></div>
+            </div>
+        }
+        else
+        {
+            <div class="stats">
+                <div class="stat"><div class="l">Cotidiano</div><div class="v">@(Model.GastoSinDeporte is { } g0 ? Formato.Kcal(g0) : "—")<span class="u">kcal</span></div></div>
+                <div class="stat"><div class="l">Techo</div><div class="v">@Formato.Kcal(p.TechoDiario)<span class="u">kcal</span></div></div>
+                <div class="stat"><div class="l">@(def?.Etiqueta ?? "Déficit diario")</div><div class="v @(def is { EsSuperavit: true } || (def?.Diario ?? p.DeficitDiario) <= p.TechoDiario + 0.5 ? "ok" : "bad")">@Formato.Kcal(def?.Diario ?? p.DeficitDiario)</div></div>
+            </div>
+        }
+    }
+
+    @if (Model.Bmr?.Kcal is { } ger)
+    {
+        var get = Model.GastoSinDeporte;
+        var magra = Model.MasaMagraKg;
+        <div class="basal-plan">
+            <p class="etiqueta">Gasto basal</p>
+            <div class="stats">
+                <div class="stat"><div class="l">GER</div><div class="v">@Formato.Kcal(ger)<span class="u">kcal</span></div></div>
+                <div class="stat">
+                    <div class="l">Cotidiano</div>
+                    <div class="v">
+                        @if (get is { } g)
+                        {
+                            @Formato.Kcal(g)<span class="u">kcal</span>
+                        }
+                        else { <text>—</text> }
+                    </div>
+                </div>
+                <div class="stat">
+                    <div class="l">A comer</div>
+                    <div class="v">
+                        @if (Model.Macros is { } mc)
+                        {
+                            @Formato.Kcal(mc.KcalAComer)<span class="u">kcal</span>
+                        }
+                        else { <text>—</text> }
+                    </div>
+                </div>
+            </div>
+            <p class="ayuda">
+                @Metabolismo.Etiqueta(Model.Bmr.Aplicado): @Metabolismo.Formula(Model.Bmr.Aplicado, magra).
+                @if (get is { } cotidiano && Model.FactorActividad > 0)
+                {
+                    <text> × @Formato.Factor(Model.FactorActividad) pasa al día sentado (@Formato.Kcal(cotidiano) kcal). Gym y deporte se suman aparte el día que entrenás, y esos extra van a carbos.</text>
+                }
+                @if (Model.Plan is not { UsaComposicion: true })
+                {
+                    <text> Sin % de grasa, corte/recomp/ganancia son @Formato.Pct(ValoresDeFabrica.PctDeficitCorte) / @Formato.Pct(ValoresDeFabrica.PctDeficitRecomp) / @Formato.Pct(0.10) de ese cotidiano (ISSN), recortados por el techo seguro.</text>
+                }
+                @if (Model.Bmr.Aviso is { } avisoB)
+                {
+                    <text> @avisoB</text>
+                }
+            </p>
+        </div>
+    }
+
+    @if (Model.Macros is { } macros)
+    {
+        var tot = Math.Max(1, macros.KcalProteina + macros.KcalCarbos + macros.KcalGrasa);
+        <div class="macros-plan">
+            <p class="etiqueta">Macros del día</p>
+            <p class="@(macros.NoAlcanza ? "note bad" : "ayuda")">@macros.Texto</p>
+            <div class="stats">
+                <div class="stat"><div class="l">Proteína</div><div class="v">@Formato.G(macros.ProteinaG)<span class="u">g</span></div><div class="hint">@Formato.Kcal(macros.KcalProteina) kcal</div></div>
+                <div class="stat"><div class="l">Carbos</div><div class="v">@Formato.G(macros.CarbosG)<span class="u">g</span></div><div class="hint">@Formato.Kcal(macros.KcalCarbos) kcal</div></div>
+                <div class="stat"><div class="l">Grasa</div><div class="v">@Formato.G(macros.GrasaG)<span class="u">g</span></div><div class="hint">@Formato.Kcal(macros.KcalGrasa) kcal · @macros.GrasaGPorKg.ToString("0.#") g/kg</div></div>
+            </div>
+            <div class="macrobar">
+                @if (macros.KcalProteina > 0) { <span style="width:@(Formato.PctCss(macros.KcalProteina/tot*100))%;background:var(--verde)"></span> }
+                @if (macros.KcalCarbos > 0) { <span style="width:@(Formato.PctCss(macros.KcalCarbos/tot*100))%;background:var(--ambar)"></span> }
+                @if (macros.KcalGrasa > 0) { <span style="width:@(Formato.PctCss(macros.KcalGrasa/tot*100))%;background:var(--naranja)"></span> }
+            </div>
+            <div class="legend">
+                <span><i style="background:var(--verde)"></i>Proteína</span>
+                <span><i style="background:var(--ambar)"></i>Carbos</span>
+                <span><i style="background:var(--naranja)"></i>Grasa</span>
+            </div>
+        </div>
+    }
+</div>

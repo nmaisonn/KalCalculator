@@ -1,0 +1,22 @@
+@model KcalTracker.Pages.VistaHoyLinea
+@using KcalTracker
+@using KcalTracker.Calculo
+@{
+    var item = Model.Item;
+    var sinMacros = item.Proteina is null && item.Carbos is null && item.Grasa is null;
+}
+<li class="linea-item">
+    <span class="nom">
+        <span>@item.Nombre</span>
+        @if (sinMacros) { <span class="tag-afuera">de afuera</span> }
+        <span class="por">@item.Porcion</span>
+    </span>
+    <partial name="_FraccionHecha" model="VistaFraccion.Item(Model.FechaIso, item.Id, FraccionHecha.FactorDeItem(item.Cantidad, item.CantidadBase, item.GrupoFactor))" />
+    <span class="kcal-txt">@Formato.Kcal(item.Kcal * item.Cantidad) kcal</span>
+    <form method="post" asp-page-handler="Quitar" asp-route-itemId="@item.Id"
+          hx-post="?handler=Quitar&itemId=@item.Id"
+          hx-target="#hoy-comidas" hx-swap="outerHTML show:none focus-scroll:false" class="inline">
+        <input type="hidden" name="Fecha" value="@Model.FechaIso" />
+        <button type="submit" class="btn-borrar" title="Quitar" aria-label="Quitar">×</button>
+    </form>
+</li>

@@ -1,0 +1,28 @@
+@model KcalTracker.Pages.VistaFraccion
+@using KcalTracker.Calculo
+@{
+    var v = Model.Valor <= 0 ? 1 : Model.Valor;
+    var pct = FraccionHecha.Porcentaje(v);
+    var pctId = $"pct-{Model.Handler}-{Model.Hidden.Last().Value}";
+}
+<div class="fraccion" title="@Model.Titulo">
+    @if (Model.Htmx)
+    {
+        <form method="post" asp-page-handler="@Model.Handler" class="fraccion-pct"
+              hx-post="?handler=@Model.Handler" hx-target="@Model.HtmxTarget" hx-swap="outerHTML show:none focus-scroll:false" hx-include="this" hx-trigger="change">
+            @foreach (var h in Model.Hidden) { <input type="hidden" name="@h.Name" value="@h.Value" /> }
+            <label class="sr" for="@pctId">Porcentaje</label>
+            <input id="@pctId" name="porcentaje" type="number" min="10" max="2000" step="5" value="@pct" inputmode="numeric" />
+            <span>%</span>
+        </form>
+    }
+    else
+    {
+        <form method="post" asp-page-handler="@Model.Handler" class="fraccion-pct">
+            @foreach (var h in Model.Hidden) { <input type="hidden" name="@h.Name" value="@h.Value" /> }
+            <label class="sr" for="@pctId">Porcentaje</label>
+            <input id="@pctId" name="porcentaje" type="number" min="10" max="2000" step="5" value="@pct" inputmode="numeric" onchange="this.form.submit()" />
+            <span>%</span>
+        </form>
+    }
+</div>

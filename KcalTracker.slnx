@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/KcalTracker/KcalTracker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KcalTracker.Tests/KcalTracker.Tests.csproj" />
+  </Folder>
+</Solution>

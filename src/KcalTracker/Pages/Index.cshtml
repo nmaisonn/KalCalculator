@@ -1,0 +1,87 @@
+﻿@page
+@model IndexModel
+@using KcalTracker
+@using KcalTracker.Calculo
+@{
+    ViewData["Title"] = "Hoy";
+    ViewData["Nav"] = "hoy";
+    var v = Model.Vista;
+    var b = v.Balance;
+    var hoy = DateOnly.FromDateTime(DateTime.Today);
+    var fechaIso = Model.Fecha.ToString("yyyy-MM-dd");
+}
+
+<div class="page-head">
+    <div class="datenav" style="margin:0;flex:1">
+        <div class="row" style="margin:0">
+            <a class="nav-dia" asp-page="/Index" asp-route-fecha="@Model.Fecha.AddDays(-1).ToString("yyyy-MM-dd")" aria-label="Día anterior">‹</a>
+            <form method="get" asp-page="/Index" class="nav-cal">
+                <label class="nav-cal-btn" title="Elegir día">
+                    <span class="d">@Formato.FechaDia(Model.Fecha)</span>
+                    <span class="nav-dia nav-cal-ico" aria-hidden="true"></span>
+                    <span class="sr">Elegir día</span>
+                    <input type="date" name="fecha" value="@fechaIso"
+                           data-sin-envolver
+                           onchange="this.form.submit()" />
+                </label>
+            </form>
+            <a class="nav-dia" asp-page="/Index" asp-route-fecha="@Model.Fecha.AddDays(1).ToString("yyyy-MM-dd")" aria-label="Día siguiente">›</a>
+        </div>
+    </div>
+    <div class="page-actions">
+        <partial name="_HoyDeficitMini" />
+        @if (Model.Fecha != hoy)
+        {
+            <a class="btn-sec" asp-page="/Index" asp-route-fecha="@hoy.ToString("yyyy-MM-dd")">Hoy</a>
+        }
+        <details class="menu">
+            <summary class="btn-sec">Más</summary>
+            <div class="menu-panel">
+                <form method="get" title="Ir a otro día">
+                    <label for="ir-fecha">Ir al día</label>
+                    <input id="ir-fecha" type="date" name="fecha" value="@fechaIso"
+                           onchange="this.form.submit()" />
+                </form>
+                <form method="post" asp-page-handler="Copiar">
+                    <input type="hidden" name="Fecha" value="@fechaIso" />
+                    <label for="CopiarDesde">Copiar desde</label>
+                    <div class="fila">
+                        <input id="CopiarDesde" name="CopiarDesde" type="date"
+                               value="@Model.CopiarDesde.ToString("yyyy-MM-dd")" max="@fechaIso" />
+                        <button type="submit" class="btn-sec">Copiar acá</button>
+                    </div>
+                </form>
+                @if (b.HayRegistro)
+                {
+                    <form method="post" asp-page-handler="Vaciar" class="fila">
+                        <input type="hidden" name="Fecha" value="@fechaIso" />
+                        <button type="submit" class="btn-ghost">Vaciar el día</button>
+                    </form>
+                }
+            </div>
+        </details>
+    </div>
+</div>
+
+<div class="page-body">
+    @await Html.PartialAsync("_HoyComidas")
+    <partial name="_HoyEntreno" />
+
+    <dialog class="modal-puntual" id="modal-puntual" aria-labelledby="modal-puntual-titulo">
+        <form method="post" id="form-puntual" autocomplete="off">
+            @Html.AntiForgeryToken()
+            <h2 id="modal-puntual-titulo">Agregar</h2>
+            <p class="ayuda" id="modal-puntual-ayuda">No se guarda en el catálogo. Solo entra en este día.</p>
+            <input type="hidden" name="Fecha" value="@fechaIso" />
+            <input type="hidden" name="tipoComidaId" id="modal-puntual-tipo" value="" />
+            <label for="modal-puntual-nombre">Qué es</label>
+            <input id="modal-puntual-nombre" name="nombre" type="text" required maxlength="80" autocomplete="off" />
+            <label for="modal-puntual-kcal">kcal</label>
+            <input id="modal-puntual-kcal" name="kcal" type="number" min="1" max="20000" step="1" inputmode="numeric" required class="corto" />
+            <div class="modal-acciones">
+                <button type="button" class="btn-sec" data-cerrar-puntual>Cancelar</button>
+                <button type="submit" class="btn-pri">Sumar</button>
+            </div>
+        </form>
+    </dialog>
+</div>

@@ -1,0 +1,2002 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kcal-tracker — prototipo</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --line: #e3e6ea;
+    --line-soft: #eef0f3;
+    --text: #16191d;
+    --text-2: #5b6470;
+    --text-3: #8b939e;
+    --accent: #2f6fd0;
+    --green: #1d7a4f;
+    --green-bg: #e8f5ee;
+    --amber: #9a6608;
+    --amber-bg: #fdf3e0;
+    --red: #b4232f;
+    --red-bg: #fdeaec;
+    --blue: #2f6fd0;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .proto-banner {
+    background: #2b3038; color: #dfe3e8; padding: 7px 16px;
+    font-size: 12px; letter-spacing: .02em;
+  }
+  .proto-banner b { color: #fff; }
+  .shell { display: flex; min-height: calc(100vh - 32px); }
+
+  /* ---------- barra lateral ---------- */
+  aside {
+    width: 232px; flex: 0 0 232px; background: var(--surface);
+    border-right: 1px solid var(--line); padding: 18px 0;
+    display: flex; flex-direction: column;
+  }
+  .brand { font-weight: 600; font-size: 15px; padding: 0 18px 16px; }
+  nav a {
+    display: block; padding: 8px 18px; color: var(--text-2);
+    text-decoration: none; border-left: 2px solid transparent; cursor: pointer;
+  }
+  nav a:hover { background: var(--line-soft); color: var(--text); }
+  .navgrupo {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--text-3); padding: 14px 10px 4px; font-weight: 600;
+  }
+  .navgrupo:first-child { padding-top: 2px; }
+  nav a.on {
+    color: var(--text); font-weight: 600;
+    border-left-color: var(--accent); background: var(--line-soft);
+  }
+  .side-foot {
+    margin-top: auto; padding: 14px 18px 0; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--text-2); line-height: 1.7;
+  }
+  .side-foot b { color: var(--text); font-weight: 600; }
+
+  /* ---------- estructura ---------- */
+  main { flex: 1; padding: 22px 28px 60px; max-width: 1080px; }
+  h1 { font-size: 20px; margin: 0 0 2px; font-weight: 600; }
+  h2 { font-size: 15px; margin: 26px 0 10px; font-weight: 600; }
+  h3 { font-size: 13px; margin: 0 0 8px; font-weight: 600; color: var(--text-2);
+       text-transform: uppercase; letter-spacing: .05em; }
+  .sub { color: var(--text-2); margin: 0 0 18px; max-width: 70ch; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .spread { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+
+  /* ---------- metricas ---------- */
+  .stats { display: flex; gap: 26px; flex-wrap: wrap; }
+  .stat .v { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12px; color: var(--text-3); }
+  .hero .v { font-size: 32px; line-height: 1.1; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .hero .l { font-size: 12px; color: var(--text-3); margin-bottom: 2px; }
+  .hero .n { font-size: 12px; color: var(--text-2); margin-top: 3px; }
+  .ok { color: var(--green); } .warn { color: var(--amber); } .bad { color: var(--red); }
+
+  /* ---------- barra de macros ---------- */
+  .macrobar { display: flex; height: 9px; border-radius: 5px; overflow: hidden; background: var(--line); }
+  .macrobar span { display: block; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); margin-top: 7px; }
+  .legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+
+  /* ---------- controles ---------- */
+  button, select {
+    font: inherit; border: 1px solid var(--line); background: var(--surface);
+    color: var(--text); border-radius: 6px; padding: 6px 11px; cursor: pointer;
+  }
+  button:hover { background: var(--line-soft); border-color: #cfd4da; }
+  .combo { font-weight: 500; }
+  .chip {
+    border: 1px solid var(--line); background: var(--surface); border-radius: 20px;
+    padding: 4px 11px; font-size: 12.5px; cursor: pointer; color: var(--text-2);
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.on { background: #eaf1fb; border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .chip small { color: var(--text-3); margin-left: 3px; }
+  .chip.on small { color: var(--accent); }
+  .ghost { border-color: transparent; background: transparent; color: var(--text-3); padding: 2px 6px; }
+  .ghost:hover { color: var(--red); background: var(--red-bg); }
+  button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
+  button:disabled:hover { border-color: var(--line); color: var(--text-2); }
+  .datenav { display: flex; align-items: center; gap: 10px; }
+  .datenav .d { font-weight: 600; min-width: 270px; }
+  input[type=search], input[type=number], input[type=date], input[type=text] {
+    font: inherit; padding: 6px 10px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--surface); color: var(--text); width: 100%;
+  }
+
+  /* ---------- tablas ---------- */
+  table { width: 100%; border-collapse: collapse; }
+  .framed { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em;
+       color: var(--text-3); font-weight: 600; padding: 9px 12px; background: #fafbfc;
+       border-bottom: 1px solid var(--line); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+  .num { text-align: right; }
+  .grp td { background: #fafbfc; font-weight: 600; font-size: 12.5px; }
+  .muted { color: var(--text-3); }
+  .dash { color: var(--text-3); }
+
+  /* ---------- avisos ---------- */
+  .note { border-radius: 7px; padding: 11px 13px; font-size: 13px; border: 1px solid; }
+  .note.ok { background: var(--green-bg); border-color: #c3e3d1; color: #17503a; }
+  .note.bad { background: var(--red-bg); border-color: #f3ccd1; color: #7d1b24; }
+  .note.info { background: #eef4fc; border-color: #cfdff6; color: #1d477f; }
+  .note.plain { background: #fafbfc; border-color: var(--line); color: var(--text-2); }
+  .note b { display: block; margin-bottom: 3px; }
+  .formula { font-family: var(--mono); font-size: 12.5px; color: var(--text-2); line-height: 1.9; }
+
+  .hide { display: none !important; }
+  svg text { font-size: 10px; fill: var(--text-3); }
+</style>
+</head>
+<body>
+
+<div class="proto-banner">
+  <b>Prototipo no funcional</b> · mockup para acordar el diseño de kcal-tracker. Nada se guarda: al recargar vuelve al estado inicial.
+  Los datos son de una <b>cuenta de ejemplo</b>, cargados desde una plantilla: en la aplicación real cada cuenta arranca vacía y el usuario decide qué importar.
+</div>
+
+<div class="shell">
+  <aside>
+    <div class="brand">kcal-tracker</div>
+    <nav id="nav"></nav>
+    <div class="side-foot" id="sidefoot"></div>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<script>
+// =========================================================================
+// Cuenta de ejemplo. En la aplicación real todo esto son datos del usuario:
+// se importan de una plantilla al crear la cuenta, o se cargan a mano.
+// Los valores provienen de Alimentación.xlsx con los 14 macros corregidos.
+// =========================================================================
+const CUENTA = { email:"ejemplo@kcal-tracker", nombre:"Cuenta de ejemplo" };
+
+// Catálogos de tipos: en la version 1.0 eran enums fijos en el codigo (RF-I3, RF-I4).
+const TIPOS_COMIDA   = ["Desayuno","Media mañana","Almuerzo","Merienda","Cena","Extra"];
+const TIPOS_ACTIVIDAD = ["gym","cardio","deporte"];
+const CATEGORIAS      = ["Comida","Acompañamiento","Vegetal","Fruta","Extra","Restaurante"];
+const GRUPOS          = ["Pecho","Espalda","Pierna","Hombro","Bíceps","Tríceps"];
+
+// Configuración editable: ningun numero del calculo vive en el codigo (RF-I5, RF-I9).
+const CFG = {
+  kcalPorKgGrasa: 7700,
+  kcalPorKgMagro: 1500,
+  metodoBmr: "katch",        // katch | mifflin | medido
+  bmrMedido: null,
+  pctGastoMax: 0.25,
+  pctPesoSemanal: 0.0075,
+  cobMinContraste: 0.50,
+  cobMinCalibrado: 0.70,
+  factorActividad: 1.2,
+  alturaCm: 178,
+  fechaNac: "1990-01-01",
+  sexo: "M",
+};
+const ALIMENTOS = [
+  { id:"pan",       n:"Pan Los Sorchantes",     porc:"2 rebanadas (50 g)", kcal:127, p:4.3, c:25,  g:1.1 },
+  { id:"requeson",  n:"Requeson light",         porc:"18 g",               kcal:46,  p:4,   c:0.8, g:3   },
+  { id:"leche",     n:"Leche descremada",       porc:"200 ml",             kcal:68,  p:7,   c:10,  g:0   },
+  { id:"queso",     n:"Queso magro",            porc:"29 g",               kcal:58,  p:8,   c:0,   g:2.9 },
+  { id:"manzana",   n:"Manzana verde",          porc:"1 (180 g)",          kcal:94,  p:0.5, c:25,  g:0.3 },
+  { id:"mandarina", n:"Mandarina",              porc:"1 (90 g)",           kcal:48,  p:0.7, c:12,  g:0.3 },
+  { id:"yogur",     n:"Yogur Viva Light",       porc:"1 vaso (200 g)",     kcal:100, p:9.9, c:15,  g:0   },
+  { id:"pollo",     n:"Pechuga s/piel cruda",   porc:"250 g",              kcal:285, p:57,  c:0,   g:6.5 },
+  { id:"cuadril",   n:"Cuadril magro crudo",    porc:"250 g",              kcal:375, p:55,  c:0,   g:17.5},
+  { id:"higado",    n:"Higado de vaca",         porc:"250 g",              kcal:340, p:51,  c:0,   g:9   },
+  { id:"arroz60",   n:"Arroz Saman crudo",      porc:"60 g",               kcal:215, p:4.5, c:47,  g:0.4 },
+  { id:"zanahoria", n:"Zanahoria hervida",      porc:"1 (70 g)",           kcal:25,  p:0.6, c:6,   g:0.2 },
+  { id:"huevo",     n:"Huevo",                  porc:"1",                  kcal:72,  p:6.3, c:0.4, g:4.8 },
+  { id:"aceite",    n:"Aceite",                 porc:"1 cucharadita",      kcal:40,  p:0,   c:0,   g:4   },
+];
+const AFUERA = [
+  { id:"rudy_sin", n:"Rudy doble sin fritas",  porc:"1",      kcal:950,  p:null, c:null, g:null },
+  { id:"rudy_con", n:"Rudy doble con fritas",  porc:"1",      kcal:1400, p:null, c:null, g:null },
+  { id:"muzza",    n:"Muzza Requete + faina",  porc:"1",      kcal:1600, p:null, c:null, g:null },
+  { id:"mila",     n:"Mila napo sin fritas",   porc:"1",      kcal:1000, p:null, c:null, g:null },
+  { id:"empan",    n:"2 empanadas",            porc:"2",      kcal:490,  p:null, c:null, g:null },
+  { id:"coca",     n:"Coca 250 ml",            porc:"250 ml", kcal:105,  p:null, c:null, g:null },
+];
+const CAT = [...ALIMENTOS, ...AFUERA];
+const byId = id => CAT.find(a => a.id === id);
+
+const TIPOS = ["desayuno","media manana","almuerzo","merienda","cena","extra"];
+const COMBOS = [
+  { id:"c1", n:"Desayuno completo",     tipo:"desayuno", items:["pan","requeson","leche","queso","manzana"] },
+  { id:"c2", n:"Merienda completa",     tipo:"merienda", items:["pan","requeson","leche","yogur","mandarina"] },
+  { id:"c3", n:"Almuerzo/cena pollo",   tipo:"almuerzo", items:["pollo","arroz60","zanahoria","aceite"] },
+  { id:"c4", n:"Almuerzo/cena cuadril", tipo:"cena",     items:["cuadril","arroz60","zanahoria","aceite"] },
+];
+const ACTIVIDADES = [
+  { id:"d1",    n:"Dia 1 — Espalda + biceps",   tipo:"gym",     kcal:330 },
+  { id:"d2",    n:"Dia 2 — Pecho + triceps",    tipo:"gym",     kcal:310 },
+  { id:"d3",    n:"Dia 3 — Pierna",             tipo:"gym",     kcal:390 },
+  { id:"d4",    n:"Dia 4 — Hombro + brazos",    tipo:"gym",     kcal:280 },
+  { id:"cinta", n:"Cinta 30 min, 5 km/h al 10%",tipo:"cardio",  kcal:290 },
+  { id:"fut",   n:"Futbol 5",                   tipo:"deporte", kcal:550 },
+];
+// ---- Gym: catalogo de ejercicios (hojas Ejercicio y EjercicioIA) ----
+const EJERCICIOS = [
+  { id:"jalon",  n:"Jalón",                 gm:"Espalda" },
+  { id:"remoT",  n:"Remo con barra T",      gm:"Espalda" },
+  { id:"remoB",  n:"Remo bajo / máquina",   gm:"Espalda" },
+  { id:"delt",   n:"Deltoides polea",       gm:"Hombro"  },
+  { id:"curlB",  n:"Curl barra",            gm:"Bíceps"  },
+  { id:"curlM",  n:"Curl martillo",         gm:"Bíceps"  },
+  { id:"curlI",  n:"Curl inclinado",        gm:"Bíceps"  },
+  { id:"banca",  n:"Press banca",           gm:"Pecho"   },
+  { id:"inclin", n:"Press inclinado",       gm:"Pecho"   },
+  { id:"apert",  n:"Aperturas",             gm:"Pecho"   },
+  { id:"polea",  n:"Extensión tríceps polea", gm:"Tríceps" },
+  { id:"trasn",  n:"Trasnuca polea",        gm:"Tríceps" },
+  { id:"sent",   n:"Sentadilla",            gm:"Pierna"  },
+  { id:"muerto", n:"Peso muerto rumano",    gm:"Pierna"  },
+  { id:"prensa", n:"Prensa",                gm:"Pierna"  },
+  { id:"femor",  n:"Curl femoral",          gm:"Pierna"  },
+  { id:"cuad",   n:"Cuádriceps",            gm:"Pierna"  },
+  { id:"aduct",  n:"Aductores",             gm:"Pierna"  },
+  { id:"lat",    n:"Vuelos laterales",      gm:"Hombro"  },
+  { id:"milit",  n:"Press militar",         gm:"Hombro"  },
+];
+
+// Rutinas: la prescripcion. series, repsMin/repsMax, peso de referencia.
+// peso null + obs = el caso "Maximo maquina" de la planilla (RN-13).
+const RUTINAS = [
+  { id:"r1", n:"Mi rutina", desc:"La de las hojas Ejercicio", activa:true, dias:[
+    { n:"Día 1 — Espalda + bíceps", ejs:[
+      { e:"jalon",  s:4, rMin:6,  rMax:10, peso:65,   mas:true  },
+      { e:"remoT",  s:3, rMin:8,  rMax:10, peso:45,   mas:true  },
+      { e:"remoB",  s:3, rMin:10, rMax:12, peso:50,   obs:"35 kg en la otra máquina" },
+      { e:"delt",   s:3, rMin:12, rMax:15, peso:30 },
+      { e:"curlB",  s:3, rMin:8,  rMax:10, peso:10,   obs:"15 con mancuerna" },
+      { e:"curlM",  s:2, rMin:10, rMax:12, peso:10 },
+      { e:"curlI",  s:2, rMin:10, rMax:12, peso:25,   obs:"12.5 mancuerna" },
+    ]},
+    { n:"Día 2 — Pecho + tríceps", ejs:[
+      { e:"banca",  s:4, rMin:6,  rMax:10, peso:27.5, mas:true },
+      { e:"inclin", s:3, rMin:8,  rMax:10, peso:45,   obs:"Declinado 70" },
+      { e:"apert",  s:3, rMin:10, rMax:12, peso:60 },
+      { e:"polea",  s:3, rMin:8,  rMax:12, peso:45 },
+      { e:"trasn",  s:3, rMin:10, rMax:12, peso:35 },
+    ]},
+    { n:"Día 3 — Pierna", ejs:[
+      { e:"sent",   s:4, rMin:6,  rMax:10, peso:95 },
+      { e:"muerto", s:3, rMin:8,  rMax:10, peso:27.5, mas:true },
+      { e:"prensa", s:3, rMin:10, rMax:12, peso:120 },
+      { e:"femor",  s:3, rMin:10, rMax:12, peso:66,   mas:true },
+      { e:"cuad",   s:3, rMin:12, rMax:15, peso:66 },
+      { e:"aduct",  s:2, rMin:12, rMax:12, peso:null, obs:"Máximo máquina" },
+    ]},
+    { n:"Día 4 — Hombro + brazos", ejs:[
+      { e:"inclin", s:3, rMin:8,  rMax:10, peso:32.5, mas:true },
+      { e:"remoT",  s:3, rMin:8,  rMax:10, peso:40 },
+      { e:"jalon",  s:2, rMin:10, rMax:12, peso:50 },
+      { e:"lat",    s:3, rMin:12, rMax:15, peso:15 },
+      { e:"polea",  s:2, rMin:8,  rMax:12, peso:40 },
+      { e:"curlB",  s:2, rMin:8,  rMax:12, peso:7.5 },
+    ]},
+  ]},
+  { id:"r2", n:"Rutina de 5 días", desc:"La alternativa de la hoja EjercicioIA", activa:false, dias:[
+    { n:"Día 1 — Espalda + bíceps", ejs:[
+      { e:"jalon", s:4, rMin:6, rMax:10, peso:70 },
+      { e:"remoT", s:3, rMin:8, rMax:10, peso:45 },
+      { e:"curlB", s:3, rMin:8, rMax:10, peso:10, obs:"15 mancuerna" },
+    ]},
+    { n:"Día 2 — Pecho + tríceps", ejs:[
+      { e:"banca",  s:4, rMin:6, rMax:10, peso:27.5, mas:true },
+      { e:"inclin", s:3, rMin:8, rMax:10, peso:45,   obs:"Declinado 70" },
+    ]},
+    { n:"Día 3 — Pierna", ejs:[
+      { e:"prensa", s:4, rMin:6, rMax:10, peso:90, mas:true },
+      { e:"cuad",   s:3, rMin:10, rMax:12, peso:70 },
+    ]},
+    { n:"Día 4 — Espalda + hombro", ejs:[
+      { e:"jalon", s:3, rMin:6, rMax:10, peso:70 },
+      { e:"lat",   s:3, rMin:12, rMax:12, peso:15 },
+    ]},
+    { n:"Día 5 — Pecho + hombro", ejs:[
+      { e:"inclin", s:3, rMin:8, rMax:10, peso:45 },
+      { e:"apert",  s:3, rMin:10, rMax:12, peso:66 },
+    ]},
+  ]},
+];
+
+// Sesiones de gym: lo que realmente se levanto. Es lo que la planilla no guarda.
+const SESIONES_GYM = [
+  { f:"2026-03-24", dia:"Día 1 — Espalda + bíceps", kcal:330, ejs:[
+    { e:"jalon", s:4, r:8, peso:55 }, { e:"remoT", s:3, r:8, peso:35 }, { e:"curlB", s:3, r:8, peso:7.5 } ] },
+  { f:"2026-04-21", dia:"Día 1 — Espalda + bíceps", kcal:330, ejs:[
+    { e:"jalon", s:4, r:8, peso:60 }, { e:"remoT", s:3, r:8, peso:40 }, { e:"curlB", s:3, r:8, peso:10 } ] },
+  { f:"2026-05-19", dia:"Día 1 — Espalda + bíceps", kcal:330, ejs:[
+    { e:"jalon", s:4, r:8, peso:60 }, { e:"remoT", s:3, r:10, peso:40 }, { e:"curlB", s:3, r:8, peso:10 } ] },
+  { f:"2026-06-23", dia:"Día 1 — Espalda + bíceps", kcal:330, ejs:[
+    { e:"jalon", s:4, r:8, peso:65 }, { e:"remoT", s:3, r:8, peso:45 }, { e:"curlB", s:3, r:10, peso:10 } ] },
+  { f:"2026-07-21", dia:"Día 1 — Espalda + bíceps", kcal:330, ejs:[
+    { e:"jalon", s:4, r:6, peso:65 }, { e:"remoT", s:3, r:8, peso:45 }, { e:"curlM", s:2, r:10, peso:10 } ] },
+  { f:"2026-08-18", dia:"Día 1 — Espalda + bíceps", kcal:330, ejs:[
+    { e:"jalon", s:4, r:8, peso:65 }, { e:"remoB", s:3, r:10, peso:50 }, { e:"curlI", s:2, r:10, peso:25 } ] },
+  { f:"2026-09-15", dia:"Día 1 — Espalda + bíceps", kcal:330, ejs:[
+    { e:"jalon", s:4, r:8, peso:67.5 }, { e:"remoT", s:3, r:8, peso:45 },
+    { e:"remoB", s:3, r:10, peso:50 }, { e:"delt", s:3, r:12, peso:30 },
+    { e:"curlB", s:3, r:8, peso:10 }, { e:"curlM", s:2, r:10, peso:10 },
+    { e:"curlI", s:2, r:10, peso:25 } ] },
+  { f:"2026-09-16", dia:"Día 2 — Pecho + tríceps", kcal:310, ejs:[
+    { e:"banca", s:4, r:8, peso:27.5 }, { e:"inclin", s:3, r:8, peso:45 },
+    { e:"apert", s:3, r:12, peso:60 }, { e:"polea", s:3, r:10, peso:45 } ] },
+];
+
+// Cardio: la hoja Cardio, con kcal como rango (RN-14).
+const PROTOCOLOS = [
+  { id:"hiit", n:"HIIT jueves", desc:"Intervalos en cinta", bloques:[
+    { n:"Entrada",       min:5,   vel:5.0, inc:5, rep:1 },
+    { n:"Sprint",        min:0.5, vel:9.0, inc:5, rep:6 },
+    { n:"Recuperación",  min:1,   vel:4.8, inc:5, rep:6 },
+    { n:"Salida",        min:5,   vel:5.0, inc:5, rep:1 },
+  ]},
+];
+const SESIONES_CARDIO = [
+  { f:"2026-08-20", min:30, vel:5.0, inc:7, kMin:160, kMax:220, prot:null },
+  { f:"2026-08-27", min:30, vel:5.2, inc:8, kMin:180, kMax:240, prot:null },
+  { f:"2026-09-03", min:30, vel:5.5, inc:9, kMin:200, kMax:280, prot:null },
+  { f:"2026-09-04", min:19, vel:null, inc:null, kcal:260, prot:"hiit" },
+  { f:"2026-09-07", min:30, vel:5.0, inc:8, kMin:170, kMax:230, prot:null },
+  { f:"2026-09-09", min:15, vel:5.0, inc:7, kcal:97,  prot:null },
+  { f:"2026-09-16", min:30, vel:5.6, inc:10, kcal:290, prot:null },
+];
+
+const MEDICIONES = [
+  { f:"2022-11-04", peso:71.8, gp:15.8, mp:43.3, v:6 },
+  { f:"2026-03-20", peso:73.9, gp:21.8, mp:39.4, v:7 },
+  { f:"2026-04-22", peso:74.0, gp:20.6, mp:40.2, v:7 },
+  { f:"2026-08-16", peso:74.1, gp:18.8, mp:41.2, v:7 },
+  { f:"2026-08-19", peso:73.1, gp:18.0, mp:41.7, v:7 },
+  { f:"2026-09-15", peso:72.2, gp:17.2, mp:42.2, v:7 },
+];
+
+// Historico de dias registrados (SeguimientoKcal, 7 al 16 de septiembre).
+// La actividad esta en kcal; el gasto se recalcula con RN-02, no con las 2250 fijas.
+const DIAS = [
+  { f:"2026-09-07", ingesta:1984, act:455, p:118, c:190, g:62, afuera:0 },
+  { f:"2026-09-08", ingesta:1789, act:0,   p:112, c:168, g:55, afuera:0 },
+  { f:"2026-09-09", ingesta:2211, act:252, p:120, c:205, g:70, afuera:92 },
+  { f:"2026-09-10", ingesta:1506, act:550, p:105, c:130, g:48, afuera:0 },
+  { f:"2026-09-11", ingesta:2001, act:0,   p:124, c:175, g:61, afuera:0 },
+  { f:"2026-09-12", ingesta:2030, act:0,   p:119, c:180, g:63, afuera:0 },
+  { f:"2026-09-13", ingesta:1441, act:0,   p:96,  c:120, g:44, afuera:0 },
+  { f:"2026-09-14", ingesta:2074, act:0,   p:127, c:182, g:64, afuera:0 },
+  { f:"2026-09-15", ingesta:3785, act:330, p:150, c:320, g:130,afuera:2665 },
+  { f:"2026-09-16", ingesta:1511, act:600, p:110, c:135, g:45, afuera:0 },
+];
+const SESIONES = [
+  { f:"2026-09-07", act:"d1",    kcal:165 }, { f:"2026-09-07", act:"cinta", kcal:290 },
+  { f:"2026-09-09", act:"d2",    kcal:155 }, { f:"2026-09-09", act:"cinta", kcal:97  },
+  { f:"2026-09-10", act:"fut",   kcal:550 },
+  { f:"2026-09-15", act:"d1",    kcal:330 },
+  { f:"2026-09-16", act:"d2",    kcal:310 }, { f:"2026-09-16", act:"cinta", kcal:290 },
+];
+
+// ---- Reglas de negocio (RN-01 a RN-06 del documento de requerimientos) ----
+const KCAL_GRASA = 7700, KCAL_MUSCULO = 1500;
+const FACTOR = 1.2;
+
+// La medicion mas reciente es la referencia. Todo lo derivado se recalcula
+// cuando se agrega, edita o elimina una medicion (RF-D8).
+let ACTUAL, MAGRA, GRASA_KG, BMR, GASTO_BASE;
+function recalcular() {
+  MEDICIONES.sort((a, b) => a.f.localeCompare(b.f));
+  ACTUAL     = MEDICIONES[MEDICIONES.length - 1];
+  MAGRA      = ACTUAL.peso * (1 - ACTUAL.gp / 100);              // 59.78 kg
+  GRASA_KG   = ACTUAL.peso * (ACTUAL.gp / 100);                  // 12.42 kg
+  BMR        = 370 + 21.6 * MAGRA;                               // RN-01
+  GASTO_BASE = BMR * FACTOR;                                     // RN-02
+}
+recalcular();
+
+function plan(objPct, semanas) {
+  const pesoObj  = MAGRA / (1 - objPct / 100);
+  const grasaObj = pesoObj - MAGRA;
+  const aPerder  = GRASA_KG - grasaObj;
+  const kcal     = aPerder * KCAL_GRASA;
+  const diario   = kcal / (semanas * 7);
+  const techo    = Math.min(GASTO_BASE * 0.25, ACTUAL.peso * 0.0075 * KCAL_GRASA / 7); // RN-05
+  return { pesoObj, grasaObj, aPerder, kcal, diario, techo, seguro: diario <= techo };
+}
+function calibracion() {                                          // RN-06
+  const a = MEDICIONES[1], b = ACTUAL;
+  const dias = Math.round((new Date(b.f) - new Date(a.f)) / 864e5);
+  const dGrasa = a.peso * a.gp / 100 - b.peso * b.gp / 100;
+  const dMusc  = b.peso * b.mp / 100 - a.peso * a.mp / 100;
+  const energia = dGrasa * KCAL_GRASA - dMusc * KCAL_MUSCULO;
+  return { dias, dGrasa, dMusc, energia, diario: energia / dias,
+           desde: a.f, hasta: b.f, diasConRegistro: 10 };
+}
+
+// Dia sintetico determinista, solo para el modo de simulacion del prototipo.
+// Permite ver como se comporta el contraste de RN-11 con cobertura alta.
+function diaSimulado(f) {
+  const semilla = [...f].reduce((s, c) => s + c.charCodeAt(0), 0);
+  const r = (semilla * 9301 + 49297) % 233280 / 233280;
+  const dow = new Date(f).getDay();
+  const entrena = dow !== 0 && dow !== 3 && r > 0.25;
+  const act = entrena ? [290, 310, 330, 390][semilla % 4] : 0;
+  const ingesta = Math.round(1612 + r * 420 + (dow === 6 ? 380 : 0));
+  return { f, ingesta, act, p: Math.round(ingesta * 0.24 / 4), c: Math.round(ingesta * 0.42 / 4),
+           g: Math.round(ingesta * 0.30 / 9), afuera: dow === 6 && r > 0.6 ? 700 : 0, sim: true };
+}
+
+const conRSim = serie => serie.filter(d => d.registro && d.sim && d.act > 0);
+
+// RN-11 — metricas de periodo. Solo cuenta dias con registro.
+function metricasPeriodo(desde, hasta, objDiario, simular) {
+  const dias = [];
+  for (let d = new Date(desde); d <= new Date(hasta); d.setDate(d.getDate() + 1))
+    dias.push(d.toISOString().slice(0, 10));
+
+  const serie = dias.map(f => {
+    const r = DIAS.find(x => x.f === f) || (simular ? diaSimulado(f) : null);
+    if (!r) return { f, registro: false };
+    const gasto = GASTO_BASE + r.act;
+    return { f, registro: true, ...r, gasto, deficit: gasto - r.ingesta };
+  });
+  const conR = serie.filter(d => d.registro);
+  const n = conR.length || 1;
+
+  const acumulado = conR.reduce((s, d) => s + d.deficit, 0);
+  const sesiones = SESIONES.filter(s => dias.includes(s.f));
+  const porTipo = {};
+  for (const s of sesiones) {
+    const t = ACTIVIDADES.find(a => a.id === s.act)?.tipo || "otro";
+    porTipo[t] = porTipo[t] || { n:0, kcal:0 };
+    porTipo[t].n++; porTipo[t].kcal += s.kcal;
+  }
+  // Los dias simulados no tienen sesiones en SESIONES: se agregan por su kcal de actividad.
+  for (const d of conRSim(serie)) {
+    porTipo.gym = porTipo.gym || { n:0, kcal:0 };
+    porTipo.gym.n++; porTipo.gym.kcal += d.act;
+  }
+
+  const kcalTotales = conR.reduce((s,d) => s + d.ingesta, 0) || 1;
+  const kcalAfuera  = conR.reduce((s,d) => s + d.afuera, 0);
+
+  const medsEnRango = MEDICIONES.filter(m => m.f >= desde && m.f <= hasta);
+  let grasaMedida = null;
+  if (medsEnRango.length >= 2) {
+    const p = medsEnRango[0], u = medsEnRango[medsEnRango.length - 1];
+    grasaMedida = p.peso * p.gp / 100 - u.peso * u.gp / 100;
+  }
+
+  return {
+    serie, diasTotales: dias.length, diasConRegistro: conR.length,
+    cobertura: conR.length / dias.length,
+    acumulado, medio: acumulado / n,
+    adherencia: conR.filter(d => d.deficit >= objDiario).length,
+    ingestaMedia: kcalTotales / n,
+    pMedia: conR.reduce((s,d) => s + d.p, 0) / n,
+    cMedia: conR.reduce((s,d) => s + d.c, 0) / n,
+    gMedia: conR.reduce((s,d) => s + d.g, 0) / n,
+    pctAfuera: kcalAfuera / kcalTotales,
+    diasAfuera: conR.filter(d => d.afuera > 0).length,
+    sesiones, porTipo,
+    diasSinActividad: conR.filter(d => d.act === 0).length,
+    grasaEstimada: acumulado / KCAL_GRASA,
+    grasaMedida, medsEnRango,
+  };
+}
+
+const f0 = n => Math.round(n).toLocaleString("es-UY");
+const f1 = n => n.toLocaleString("es-UY", { minimumFractionDigits:1, maximumFractionDigits:1 });
+const f2 = n => n.toLocaleString("es-UY", { minimumFractionDigits:2, maximumFractionDigits:2 });
+
+// =========================================================================
+// Estado del prototipo
+// =========================================================================
+const S = {
+  seccion: "dashboard",
+  tipoActivo: "almuerzo",
+  busqueda: "",
+  comidas: { desayuno:["pan","requeson","leche","queso","manzana"],
+             almuerzo:["pollo","arroz60","zanahoria","aceite"] },
+  acts: ["d1"],
+  objPct: 15,
+  semanas: 8,
+  periodo: "mes",
+  simular: false,
+  rutina: "r1",
+  sesionDia: "r1:0",
+  ejSel: null,
+  editAct: null,     // id de actividad en edicion, o "nueva"
+  editMed: null,     // fecha de medicion en edicion, o "nueva"
+  borrarMed: null,   // fecha pendiente de confirmar
+  iaTexto: "",
+  iaResultados: null,
+  iaBuscando: false,
+  sinConexion: false,
+};
+
+const SECCIONES = [
+  { g:"Registro diario" },
+  { id:"dashboard",  t:"Dashboard" },
+  { id:"hoy",        t:"Hoy" },
+  { id:"objetivo",   t:"Objetivo" },
+  { g:"Entrenamiento" },
+  { id:"actividad",  t:"Actividad" },
+  { id:"rutinas",    t:"Rutinas" },
+  { id:"gym",        t:"Sesión de gym" },
+  { id:"cardio",     t:"Cardio" },
+  { g:"Seguimiento" },
+  { id:"mediciones", t:"Mediciones" },
+  { id:"alimentos",  t:"Alimentos" },
+  { id:"ajustes",    t:"Ajustes" },
+];
+
+// =========================================================================
+// Helpers de render
+// =========================================================================
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+function itemsDelDia() {
+  const out = [];
+  for (const t of TIPOS) for (const id of (S.comidas[t] || [])) out.push({ tipo:t, a:byId(id) });
+  return out.filter(x => x.a);
+}
+function totalesDelDia() {
+  const items = itemsDelDia();
+  let kcal=0, p=0, c=0, g=0, sinMacros=0;
+  for (const { a } of items) {
+    kcal += a.kcal;
+    if (a.p === null) { sinMacros += a.kcal; continue; }   // RN-09
+    p += a.p; c += a.c; g += a.g;
+  }
+  const act = S.acts.reduce((s,id) => s + (ACTIVIDADES.find(x=>x.id===id)?.kcal || 0), 0);
+  const gasto = GASTO_BASE + act;
+  return { hayRegistro: items.length > 0, kcal, p, c, g, sinMacros,
+           act, gasto, deficit: gasto - kcal };
+}
+
+// =========================================================================
+// P1 — Hoy
+// =========================================================================
+function vistaHoy() {
+  const T = totalesDelDia();
+  const objDiario = plan(S.objPct, S.semanas).diario;
+  const cls = !T.hayRegistro ? "" : T.deficit < 0 ? "bad" : T.deficit >= objDiario ? "ok" : "warn";
+
+  // barra de macros, proporcional a las kcal que aporta cada macro
+  const kp = T.p*4, kc = T.c*4, kg = T.g*9, tot = kp+kc+kg+T.sinMacros || 1;
+  const seg = (val, color) => val > 0 ? `<span style="width:${val/tot*100}%;background:${color}"></span>` : "";
+
+  const filas = [];
+  for (const t of TIPOS) {
+    const ids = S.comidas[t] || [];
+    if (!ids.length) continue;
+    const sub = ids.reduce((s,id) => s + (byId(id)?.kcal || 0), 0);
+    filas.push(`<tr class="grp"><td>${t.charAt(0).toUpperCase()+t.slice(1)}</td>
+                <td class="num">${f0(sub)} kcal</td><td></td></tr>`);
+    ids.forEach((id, i) => {
+      const a = byId(id); if (!a) return;
+      filas.push(`<tr><td>${esc(a.n)} <span class="muted">${esc(a.porc)}</span></td>
+        <td class="num">${f0(a.kcal)}</td>
+        <td class="num"><button class="ghost" data-quitar="${t}:${i}" title="Quitar">✕</button></td></tr>`);
+    });
+  }
+  const faltan = TIPOS.filter(t => !(S.comidas[t] || []).length && t !== "extra" && t !== "media manana");
+
+  const q = S.busqueda.trim().toLowerCase();
+  const resultados = q ? ALIMENTOS.filter(a => a.n.toLowerCase().includes(q)) : [];
+
+  return `
+  <div class="datenav" style="margin-bottom:16px">
+    <button>‹</button>
+    <span class="d">miércoles 16 de septiembre de 2026</span>
+    <button>›</button>
+    <button>Hoy</button>
+    <button>Copiar otro día</button>
+  </div>
+
+  <div class="spread" style="margin-bottom:16px">
+    <div class="hero">
+      <div class="l">Déficit de hoy</div>
+      ${T.hayRegistro
+        ? `<div class="v ${cls}">${T.deficit >= 0 ? "+" : ""}${f0(T.deficit)} kcal</div>
+           <div class="n">Objetivo ${f0(objDiario)} kcal · ${
+             T.deficit >= objDiario ? "alcanzado"
+             : T.deficit < 0 ? "hoy hay superávit"
+             : "faltan " + f0(objDiario - T.deficit) + " kcal"}</div>`
+        : `<div class="v muted" style="font-size:22px">sin registro</div>
+           <div class="n">A un día sin comidas cargadas no se le asigna déficit</div>`}
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="v">${T.hayRegistro ? f0(T.kcal) : "—"}</div><div class="l">Ingesta (kcal)</div></div>
+      <div class="stat"><div class="v">${f0(T.gasto)}</div><div class="l">Gasto (kcal)</div></div>
+      <div class="stat"><div class="v ${T.p>=130?"ok":"warn"}">${f0(T.p)} g</div><div class="l">Proteína</div></div>
+    </div>
+  </div>
+
+  ${T.hayRegistro ? `
+  <div style="margin-bottom:22px">
+    <div class="macrobar">
+      ${seg(kp,"#1d7a4f")}${seg(kc,"#2f6fd0")}${seg(kg,"#c8912a")}${seg(T.sinMacros,"#aab2bc")}
+    </div>
+    <div class="legend">
+      <span><i style="background:#1d7a4f"></i>Proteína ${f0(T.p)} g</span>
+      <span><i style="background:#2f6fd0"></i>Carbos ${f0(T.c)} g</span>
+      <span><i style="background:#c8912a"></i>Grasa ${f0(T.g)} g</span>
+      ${T.sinMacros ? `<span><i style="background:#aab2bc"></i>${f0(T.sinMacros)} kcal de afuera, macros desconocidos</span>` : ""}
+    </div>
+  </div>` : ""}
+
+  <div class="cols">
+    <div>
+      <h3>Cargar</h3>
+      <div class="row" style="margin-bottom:14px">
+        ${COMBOS.map(c => {
+          const k = c.items.reduce((s,id) => s + byId(id).kcal, 0);
+          return `<button class="combo" data-combo="${c.id}">${esc(c.n)} · ${k}</button>`;
+        }).join("")}
+      </div>
+
+      <div class="row" style="margin-bottom:10px">
+        <label class="muted" style="font-size:12px">Agregar a</label>
+        <select id="tipoActivo">
+          ${TIPOS.map(t => `<option ${t===S.tipoActivo?"selected":""}>${t}</option>`).join("")}
+        </select>
+      </div>
+
+      <input type="search" id="busqueda" placeholder="Buscar alimento…" value="${esc(S.busqueda)}"
+             style="margin-bottom:10px">
+      ${q ? `<div class="row" style="margin-bottom:14px">
+        ${resultados.length
+          ? resultados.map(a => `<button class="chip" data-add="${a.id}">${esc(a.n)} <small>${a.kcal}</small></button>`).join("")
+          : `<span class="muted" style="font-size:12.5px">Sin resultados para “${esc(S.busqueda)}”</span>`}
+      </div>` : ""}
+
+      <h3 style="margin-top:14px">Frecuentes</h3>
+      <div class="row" style="margin-bottom:14px">
+        ${["pan","huevo","pollo","arroz60","leche","manzana","yogur","zanahoria"]
+          .map(id => byId(id))
+          .map(a => `<button class="chip" data-add="${a.id}">${esc(a.n)} <small>${a.kcal}</small></button>`).join("")}
+      </div>
+
+      <h3>De afuera <span class="muted" style="text-transform:none;letter-spacing:0">— solo kcal, sin macros</span></h3>
+      <div class="row">
+        ${AFUERA.map(a => `<button class="chip" data-add="${a.id}">${esc(a.n)} <small>${a.kcal}</small></button>`).join("")}
+      </div>
+    </div>
+
+    <div>
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <h3 style="margin:0">Comido hoy</h3>
+        ${T.hayRegistro ? `<button class="ghost" data-vaciar="1">Vaciar el día</button>` : ""}
+      </div>
+      ${T.hayRegistro
+        ? `<div class="framed"><table>
+             <thead><tr><th>Alimento</th><th class="num">kcal</th><th></th></tr></thead>
+             <tbody>${filas.join("")}</tbody></table></div>
+           ${faltan.length ? `<p class="muted" style="font-size:12.5px;margin:8px 0 0">
+              Sin cargar: ${faltan.join(", ")}</p>` : ""}`
+        : `<div class="note plain">Este día no tiene comidas cargadas. Queda como
+             <b style="display:inline">sin registro</b> y no entra en promedios ni acumulados.
+             La planilla, en cambio, le asignaba 2250 kcal de déficit.</div>`}
+
+      <h3 style="margin-top:22px">Actividad de hoy</h3>
+      <div class="row">
+        ${ACTIVIDADES.map(a => `<button class="chip ${S.acts.includes(a.id)?"on":""}" data-act="${a.id}">
+            ${esc(a.n)} <small>${a.kcal}</small></button>`).join("")}
+      </div>
+      <p class="formula" style="margin:10px 0 0">
+        basal ${f0(BMR)} + cotidiano ${f0(GASTO_BASE - BMR)} + deporte ${f0(T.act)} = <b>${f0(T.gasto)} kcal</b>
+      </p>
+      <p class="muted" style="font-size:12.5px;margin:4px 0 0">
+        El factor de actividad cubre solo lo cotidiano, así que sumar el entrenamiento no lo cuenta dos veces.
+      </p>
+    </div>
+  </div>`;
+}
+
+// =========================================================================
+// P11 — Rutinas · P12 — Sesion de gym · P13 — Cardio
+// =========================================================================
+const ejById = id => EJERCICIOS.find(e => e.id === id);
+
+// RN-13: el peso se reconstruye como lo escribia la planilla, sin perder el numero.
+function fmtPeso(x) {
+  if (x.peso === null || x.peso === undefined)
+    return `<span class="dash">${esc(x.obs || "—")}</span>`;
+  return `${f1(x.peso)} kg${x.mas ? " +" : ""}` +
+         (x.obs ? ` <span class="muted">(${esc(x.obs)})</span>` : "");
+}
+const fmtSerie = x => `${x.s}x${x.rMin}${x.rMax && x.rMax !== x.rMin ? "/" + x.rMax : ""}`;
+
+function vistaRutinas() {
+  const R = RUTINAS.find(r => r.id === S.rutina) || RUTINAS[0];
+  const usos = e => SESIONES_GYM.filter(s => s.ejs.some(x => x.e === e)).length;
+
+  return `
+  <div class="row" style="justify-content:space-between">
+    <h1>Rutinas</h1>
+    <div class="row">
+      ${RUTINAS.map(r => `<button class="chip ${r.id===R.id?"on":""}" data-rutina="${r.id}">
+        ${esc(r.n)}${r.activa?" ●":""}</button>`).join("")}
+      <button class="chip" style="cursor:default">+ Nueva</button>
+    </div>
+  </div>
+  <p class="sub">La rutina <b>prescribe</b>; la sesión registra lo que pasó. Separarlas es lo que
+  permite ver la progresión: la planilla sobrescribe la celda del peso y pierde lo anterior.</p>
+
+  <div class="row" style="justify-content:space-between;margin-bottom:10px">
+    <div>
+      <b>${esc(R.n)}</b> ${R.activa?'<span class="ok">· activa</span>':""}<br>
+      <span class="muted" style="font-size:12.5px">${R.dias.length} días ·
+        ${R.dias.reduce((n,d)=>n+d.ejs.length,0)} ejercicios · ${esc(R.desc)}</span>
+    </div>
+    <div class="row">
+      <button class="chip" style="cursor:default">Duplicar</button>
+      <button class="chip" style="cursor:default">Editar</button>
+    </div>
+  </div>
+
+  ${R.dias.map((d, i) => `
+    <div class="card" style="margin-bottom:12px">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <b>${esc(d.n)}</b>
+        <button data-entrenar="${R.id}:${i}">Entrenar hoy</button>
+      </div>
+      <table>
+        <thead><tr><th>Grupo</th><th>Ejercicio</th><th class="num">Series</th>
+        <th class="num">Reps</th><th>Peso</th></tr></thead>
+        <tbody>${d.ejs.map(x => {
+          const e = ejById(x.e);
+          return `<tr>
+            <td class="muted">${esc(e?.gm || "—")}</td>
+            <td>${esc(e?.n || x.e)}</td>
+            <td class="num">${x.s}</td>
+            <td class="num">${x.rMin}${x.rMax && x.rMax!==x.rMin ? "/"+x.rMax : ""}</td>
+            <td>${fmtPeso(x)}</td></tr>`;
+        }).join("")}</tbody>
+      </table>
+    </div>`).join("")}
+
+  <h2>Catálogo de ejercicios</h2>
+  <p class="sub">Los grupos musculares también los definís vos, en Ajustes.</p>
+  <div class="framed">
+    <table>
+      <thead><tr><th>Grupo</th><th>Ejercicio</th><th class="num">En rutinas</th>
+      <th class="num">Sesiones</th><th></th></tr></thead>
+      <tbody>${GRUPOS.flatMap(gm => EJERCICIOS.filter(e => e.gm === gm).map((e, j) => `<tr>
+        <td class="muted">${j===0?esc(gm):""}</td>
+        <td>${esc(e.n)}</td>
+        <td class="num muted">${RUTINAS.filter(r => r.dias.some(d => d.ejs.some(x => x.e === e.id))).length || "—"}</td>
+        <td class="num muted">${usos(e.id) || "—"}</td>
+        <td class="num"><button class="ghost" title="Editar">✎</button></td></tr>`)).join("")}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function vistaGym() {
+  const [rid, di] = (S.sesionDia || "r1:0").split(":");
+  const R = RUTINAS.find(r => r.id === rid) || RUTINAS[0];
+  const D = R.dias[+di] || R.dias[0];
+
+  // Ultima sesion de cada ejercicio, para la columna de contexto (RF-K2).
+  const ultima = id => {
+    const hist = SESIONES_GYM.filter(s => s.ejs.some(x => x.e === id))
+                             .sort((a,b) => a.f.localeCompare(b.f));
+    if (!hist.length) return null;
+    const s = hist[hist.length-1];
+    return { ...s.ejs.find(x => x.e === id), f:s.f };
+  };
+  const actCat = ACTIVIDADES.find(a => a.n.startsWith(D.n.slice(0, 5)));
+  const solapa = actCat && S.acts.includes(actCat.id);
+
+  // Progresion del ejercicio seleccionado (RF-K5).
+  const sel = S.ejSel || D.ejs[0].e;
+  const serie = SESIONES_GYM.filter(s => s.ejs.some(x => x.e === sel && x.peso != null))
+    .map(s => ({ f:s.f, peso:s.ejs.find(x => x.e === sel).peso }))
+    .sort((a,b) => a.f.localeCompare(b.f));
+
+  let grafico = `<div class="note plain">Todavía no hay sesiones registradas con
+    ${esc(ejById(sel)?.n || sel)}, así que no hay progresión que mostrar.</div>`;
+  if (serie.length >= 2) {
+    const W=620, H=190, PAD=40;
+    const lo = Math.min(...serie.map(p=>p.peso)) - 3, hi = Math.max(...serie.map(p=>p.peso)) + 3;
+    const t0 = new Date(serie[0].f).getTime();
+    const span = (new Date(serie[serie.length-1].f).getTime() - t0) || 1;
+    const X = f => PAD + (new Date(f).getTime() - t0) / span * (W - PAD - 26);
+    const Y = v => H - 26 - (v - lo) / ((hi - lo)||1) * (H - 52);
+    const d0 = serie[0], dn = serie[serie.length-1];
+    grafico = `
+    <svg width="${W}" height="${H}" style="max-width:100%">
+      <path d="${serie.map((p,i)=>`${i?"L":"M"}${X(p.f).toFixed(1)},${Y(p.peso).toFixed(1)}`).join(" ")}"
+            fill="none" stroke="#2f6fd0" stroke-width="2"/>
+      ${serie.map(p => `<circle cx="${X(p.f).toFixed(1)}" cy="${Y(p.peso).toFixed(1)}" r="3"
+        fill="#2f6fd0"><title>${p.f} · ${f1(p.peso)} kg</title></circle>`).join("")}
+      <text x="4" y="${(Y(hi-3)+4).toFixed(1)}">${f1(hi-3)} kg</text>
+      <text x="4" y="${(Y(lo+3)+4).toFixed(1)}">${f1(lo+3)} kg</text>
+      <text x="${PAD}" y="${H-6}">${d0.f}</text>
+      <text x="${W-26}" y="${H-6}" text-anchor="end">${dn.f}</text>
+    </svg>
+    <p class="muted" style="font-size:12.5px;margin:4px 0 0">De ${f1(d0.peso)} a ${f1(dn.peso)} kg ·
+      <span class="ok">+${((dn.peso/d0.peso-1)*100).toFixed(1)} %</span> en ${serie.length} sesiones.</p>`;
+  }
+
+  return `
+  <div class="row" style="justify-content:space-between">
+    <h1>Sesión de gym</h1>
+    <div class="row">
+      ${R.dias.map((d,i) => `<button class="chip ${+di===i?"on":""}" data-sesiondia="${R.id}:${i}">
+        ${esc(d.n.split("—")[0].trim())}</button>`).join("")}
+    </div>
+  </div>
+  <p class="sub">${esc(R.n)} · ${esc(D.n)} · precargado desde la rutina.
+  Cambiá solo lo que hiciste distinto.</p>
+
+  <div class="framed" style="margin-bottom:14px">
+    <table>
+      <thead><tr><th>Ejercicio</th><th>Rutina dice</th><th class="num">Series</th>
+      <th class="num">Reps</th><th class="num">Peso</th><th class="num">Últ. vez</th><th></th></tr></thead>
+      <tbody>${D.ejs.map(x => {
+        const e = ejById(x.e), u = ultima(x.e);
+        const cmp = u && x.peso != null && u.peso != null
+          ? (x.peso > u.peso ? '<span class="ok">▲</span>'
+            : x.peso < u.peso ? '<span class="bad">▼</span>' : '<span class="muted">=</span>') : "";
+        return `<tr style="${x.e===sel?"background:#f2f6fc":""}">
+          <td><a href="#" data-ejsel="${x.e}" style="color:inherit;text-decoration:none;border-bottom:1px dotted #b9c0c9">${esc(e?.n||x.e)}</a></td>
+          <td class="muted" style="font-size:12.5px">${fmtSerie(x)} · ${x.peso!=null?f1(x.peso)+" kg":esc(x.obs||"—")}</td>
+          <td class="num"><input type="number" value="${x.s}" style="width:52px"></td>
+          <td class="num"><input type="number" value="${x.rMin}" style="width:52px"></td>
+          <td class="num">${x.peso!=null
+            ? `<input type="number" step="0.5" value="${x.peso}" style="width:74px"> ${cmp}`
+            : `<input type="text" value="${esc(x.obs||"")}" style="width:120px">`}</td>
+          <td class="num muted">${u ? (u.peso!=null?f1(u.peso)+" kg":"—") : "primera"}</td>
+          <td class="num muted" style="font-size:11.5px">${u?u.f.slice(5):""}</td></tr>`;
+      }).join("")}</tbody>
+    </table>
+  </div>
+
+  <div class="row" style="margin-bottom:10px">
+    <button class="chip" style="cursor:default">+ Ejercicio fuera de la rutina</button>
+    <button class="chip" style="cursor:default">▸ Detallar serie por serie</button>
+  </div>
+
+  <div class="row" style="margin-bottom:12px">
+    <label class="muted" style="width:150px">kcal de la sesión</label>
+    <input type="number" value="${actCat ? actCat.kcal : 330}" style="width:100px">
+    <span class="muted" style="font-size:12px">
+      ${actCat ? `del catálogo "${esc(actCat.n)}", editable` : "editable"}</span>
+  </div>
+
+  ${solapa ? `<div class="note bad">
+    <b>Posible doble conteo</b>
+    Hoy ya marcaste la actividad "${esc(actCat.n)}" de ${actCat.kcal} kcal en la pantalla Hoy.
+    Si guardás esta sesión con kcal, se contarían dos veces. Es el mismo error que la planilla
+    comete con el ejercicio (P-03).
+  </div>` : ""}
+
+  <div class="row" style="margin-bottom:22px">
+    <button class="chip" style="cursor:default">Cancelar</button>
+    <button style="border-color:#2f6fd0;color:#2f6fd0">Guardar sesión</button>
+  </div>
+
+  <h2>Progresión — ${esc(ejById(sel)?.n || sel)}</h2>
+  <p class="sub">Clic en cualquier ejercicio de la tabla para ver el suyo.</p>
+  ${grafico}`;
+}
+
+function vistaCardio() {
+  const durProt = p => p.bloques.reduce((t,b) => t + b.min * b.rep, 0);
+  const kcalDe = s => s.kcal != null ? s.kcal : (s.kMin + s.kMax) / 2;
+
+  const conParam = SESIONES_CARDIO.filter(s => s.vel != null)
+                                  .sort((a,b) => a.f.localeCompare(b.f));
+  let grafico = `<div class="note plain">Hacen falta al menos dos sesiones con velocidad
+    registrada para ver la progresión.</div>`;
+  if (conParam.length >= 2) {
+    const W=660, H=200, PAD=42;
+    const vLo = Math.min(...conParam.map(s=>s.vel)) - .3, vHi = Math.max(...conParam.map(s=>s.vel)) + .3;
+    const iLo = Math.min(...conParam.map(s=>s.inc)) - 1,  iHi = Math.max(...conParam.map(s=>s.inc)) + 1;
+    const t0 = new Date(conParam[0].f).getTime();
+    const span = (new Date(conParam[conParam.length-1].f).getTime() - t0) || 1;
+    const X = f => PAD + (new Date(f).getTime() - t0) / span * (W - PAD - 46);
+    const Yv = v => H - 26 - (v - vLo) / ((vHi-vLo)||1) * (H - 52);
+    const Yi = v => H - 26 - (v - iLo) / ((iHi-iLo)||1) * (H - 52);
+    const linea = (acc, Y) => conParam.map((s,i) =>
+      `${i?"L":"M"}${X(s.f).toFixed(1)},${Y(acc(s)).toFixed(1)}`).join(" ");
+    grafico = `
+    <svg width="${W}" height="${H}" style="max-width:100%">
+      <path d="${linea(s=>s.vel, Yv)}" fill="none" stroke="#2f6fd0" stroke-width="2"/>
+      <path d="${linea(s=>s.inc, Yi)}" fill="none" stroke="#c8912a" stroke-width="2" stroke-dasharray="4 3"/>
+      ${conParam.map(s => `
+        <circle cx="${X(s.f).toFixed(1)}" cy="${Yv(s.vel).toFixed(1)}" r="3" fill="#2f6fd0"><title>${s.f} · ${f1(s.vel)} km/h</title></circle>
+        <circle cx="${X(s.f).toFixed(1)}" cy="${Yi(s.inc).toFixed(1)}" r="3" fill="#c8912a"><title>${s.f} · ${s.inc} %</title></circle>`).join("")}
+      <text x="4" y="14" fill="#2f6fd0">km/h</text>
+      <text x="${W-40}" y="14" fill="#c8912a">% incl.</text>
+      <text x="${PAD}" y="${H-6}">${conParam[0].f}</text>
+      <text x="${W-46}" y="${H-6}" text-anchor="end">${conParam[conParam.length-1].f}</text>
+    </svg>
+    <div class="legend">
+      <span><i style="background:#2f6fd0"></i>velocidad: ${f1(conParam[0].vel)} → ${f1(conParam[conParam.length-1].vel)} km/h</span>
+      <span><i style="background:#c8912a"></i>inclinación: ${conParam[0].inc} → ${conParam[conParam.length-1].inc} %</span>
+    </div>`;
+  }
+
+  return `
+  <div class="row" style="justify-content:space-between">
+    <h1>Cardio</h1>
+    <div class="row">
+      <button class="chip" style="cursor:default">+ Sesión</button>
+      <button class="chip" style="cursor:default">+ Protocolo</button>
+    </div>
+  </div>
+  <p class="sub">La planilla copia un bloque por semana, así que la progresión solo se ve leyendo
+  hacia abajo. Acá velocidad e inclinación son una serie temporal.</p>
+
+  ${grafico}
+
+  <h2>Sesiones</h2>
+  <div class="framed">
+    <table>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th class="num">Min</th><th class="num">Vel</th>
+      <th class="num">Incl</th><th class="num">kcal</th><th>Protocolo</th><th></th></tr></thead>
+      <tbody>${[...SESIONES_CARDIO].reverse().map(s => `<tr>
+        <td>${s.f}</td>
+        <td class="muted">${s.prot ? "intervalos" : "continuo"}</td>
+        <td class="num">${s.min}</td>
+        <td class="num">${s.vel!=null?f1(s.vel):'<span class="dash">var.</span>'}</td>
+        <td class="num">${s.inc!=null?s.inc+" %":'<span class="dash">var.</span>'}</td>
+        <td class="num">${f0(kcalDe(s))}${s.kcal==null
+          ? ` <span class="muted" style="font-size:11.5px">(${s.kMin}-${s.kMax})</span>` : ""}</td>
+        <td class="muted">${s.prot ? esc(PROTOCOLOS.find(p=>p.id===s.prot).n) : "—"}</td>
+        <td class="num" style="white-space:nowrap">
+          <button class="ghost" title="Editar">✎</button>
+          <button class="ghost" title="Eliminar">🗑</button></td></tr>`).join("")}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="font-size:12.5px">Cuando cargás las kcal como rango, el gasto del día usa
+  el punto medio y el rango queda a la vista. Sumar intervalos obligaría a propagar la incertidumbre
+  por todo el sistema, para una precisión que la estimación de partida no tiene (RN-14).</p>
+
+  <h2>Protocolos de intervalos</h2>
+  ${PROTOCOLOS.map(p => `
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <div><b>${esc(p.n)}</b> <span class="muted">· ${f0(durProt(p))} min · ${esc(p.desc)}</span></div>
+        <div class="row"><button class="chip" style="cursor:default">Registrar</button>
+        <button class="ghost" title="Editar">✎</button></div>
+      </div>
+      <table>
+        <thead><tr><th class="num">#</th><th>Bloque</th><th class="num">Min</th>
+        <th class="num">Vel</th><th class="num">Incl</th><th class="num">Repite</th></tr></thead>
+        <tbody>${p.bloques.map((b, i) => `<tr>
+          <td class="num muted">${i+1}</td><td>${esc(b.n)}</td>
+          <td class="num">${b.min}</td><td class="num">${f1(b.vel)}</td>
+          <td class="num">${b.inc} %</td><td class="num">×${b.rep}</td></tr>`).join("")}
+        </tbody>
+      </table>
+      <div class="formula" style="margin-top:8px">
+        duración = ${p.bloques.map(b => `${b.min}${b.rep>1?"×"+b.rep:""}`).join(" + ")}
+        = <b>${f0(durProt(p))} min</b>
+      </div>
+    </div>`).join("")}`;
+}
+
+// =========================================================================
+// P8 — Dashboard
+// =========================================================================
+const PERIODOS = {
+  semana: { t:"Semana",   desde:"2026-09-10", hasta:"2026-09-16", label:"10 al 16 de septiembre de 2026" },
+  mes:    { t:"Mes",      desde:"2026-09-01", hasta:"2026-09-30", label:"septiembre de 2026" },
+  d90:    { t:"90 días",  desde:"2026-06-19", hasta:"2026-09-16", label:"últimos 90 días" },
+  cal:    { t:"19 ago – 15 sep", desde:"2026-08-19", hasta:"2026-09-15",
+            label:"19 de agosto al 15 de septiembre — el rango entre dos mediciones" },
+};
+
+function vistaDashboard() {
+  const P = PERIODOS[S.periodo];
+  const objDiario = plan(S.objPct, S.semanas).diario;
+  const M = metricasPeriodo(P.desde, P.hasta, objDiario, S.simular);
+
+  // ---- grafico de deficit por dia ----
+  const W = 700, H = 210, PAD = 46, BASE = H - 34;
+  const vals = M.serie.filter(d => d.registro).map(d => d.deficit);
+  const top = Math.max(600, ...vals), bot = Math.min(-200, ...vals);
+  const esc_ = v => v / (top - bot) * (H - 60);
+  const y0 = BASE - esc_(-bot);
+  const bw = Math.max(3, Math.min(22, (W - PAD - 16) / M.serie.length - 3));
+  const bx = i => PAD + i * (W - PAD - 16) / M.serie.length;
+
+  const barras = M.serie.map((d, i) => {
+    if (!d.registro)
+      return `<rect x="${bx(i).toFixed(1)}" y="${y0 - 3}" width="${bw}" height="3"
+                fill="#d3d8de"><title>${d.f} · sin registro</title></rect>`;
+    const h = Math.abs(esc_(d.deficit));
+    const y = d.deficit >= 0 ? y0 - h : y0;
+    const col = d.deficit >= objDiario ? "#1d7a4f" : d.deficit >= 0 ? "#c8912a" : "#b4232f";
+    return `<rect x="${bx(i).toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${Math.max(1,h).toFixed(1)}"
+              fill="${col}" rx="1"><title>${d.f} · ${f0(d.deficit)} kcal · ingesta ${f0(d.ingesta)} · gasto ${f0(d.gasto)}</title></rect>`;
+  }).join("");
+
+  const mostrarContraste = M.cobertura >= 0.5 && M.grasaMedida !== null;
+  const disc = mostrarContraste ? M.grasaEstimada - M.grasaMedida : null;
+
+  // ---- progreso hacia el objetivo, desde el punto de partida de marzo ----
+  const grasaInicio = MEDICIONES[1].peso * MEDICIONES[1].gp / 100;   // 16.11 kg
+  const objetivoKg  = plan(S.objPct, S.semanas).grasaObj;
+  const totalPerder = grasaInicio - objetivoKg;
+  const yaPerdido   = grasaInicio - GRASA_KG;
+  const pctProg     = Math.min(100, yaPerdido / totalPerder * 100);
+
+  return `
+  <div class="row" style="justify-content:space-between;margin-bottom:4px">
+    <h1>Dashboard</h1>
+    <div class="row">
+      ${Object.entries(PERIODOS).map(([k,v]) =>
+        `<button class="chip ${k===S.periodo?"on":""}" data-per="${k}">${v.t}</button>`).join("")}
+      <button class="chip" style="cursor:default" title="En la app permite elegir un rango libre">Rango…</button>
+    </div>
+  </div>
+  <div class="row" style="justify-content:space-between;align-items:flex-start">
+    <p class="sub" style="margin:0 0 14px">${P.label}</p>
+    <label class="muted" style="font-size:12px;white-space:nowrap">
+      <input type="checkbox" id="simular" ${S.simular?"checked":""}>
+      rellenar los días sin registro con datos simulados
+    </label>
+  </div>
+  ${S.simular ? `<div class="note info" style="margin-bottom:16px">
+    <b>Modo simulación</b>
+    Los días que no están en tu planilla se rellenaron con valores plausibles, solo para poder ver
+    cómo se comporta la pantalla con cobertura alta. Los 10 días reales del 7 al 16 de septiembre
+    se mantienen intactos.
+  </div>` : ""}
+
+  <div class="stats" style="margin-bottom:22px">
+    <div class="stat"><div class="v ${M.acumulado>=0?"ok":"bad"}">${f0(M.acumulado)}</div>
+      <div class="l">Déficit acumulado (kcal)</div></div>
+    <div class="stat"><div class="v">${f0(M.medio)}</div>
+      <div class="l">Déficit medio por día</div></div>
+    <div class="stat"><div class="v ${M.cobertura>=.7?"ok":M.cobertura>=.5?"warn":"bad"}">${M.diasConRegistro} / ${M.diasTotales}</div>
+      <div class="l">Cobertura · ${Math.round(M.cobertura*100)} %</div></div>
+    <div class="stat"><div class="v">${M.adherencia} / ${M.diasConRegistro}</div>
+      <div class="l">Días que alcanzaron ${f0(objDiario)} kcal</div></div>
+  </div>
+
+  <h3>Déficit por día</h3>
+  <svg width="${W}" height="${H}" style="max-width:100%">
+    <line x1="${PAD}" y1="${y0}" x2="${W-16}" y2="${y0}" stroke="#c9ced5"/>
+    <line x1="${PAD}" y1="${(y0-esc_(objDiario)).toFixed(1)}" x2="${W-16}" y2="${(y0-esc_(objDiario)).toFixed(1)}"
+          stroke="#1d7a4f" stroke-dasharray="4 3"/>
+    <text x="${PAD-4}" y="${(y0-esc_(objDiario)+3).toFixed(1)}" text-anchor="end" fill="#1d7a4f">${f0(objDiario)}</text>
+    <text x="${PAD-4}" y="${y0+3}" text-anchor="end">0</text>
+    ${barras}
+    <text x="${PAD}" y="${H-8}">${M.serie[0].f.slice(8)} set</text>
+    <text x="${W-16}" y="${H-8}" text-anchor="end">${M.serie[M.serie.length-1].f.slice(8)} set</text>
+  </svg>
+  <div class="legend" style="margin-bottom:6px">
+    <span><i style="background:#1d7a4f"></i>alcanzó el objetivo</span>
+    <span><i style="background:#c8912a"></i>déficit insuficiente</span>
+    <span><i style="background:#b4232f"></i>superávit</span>
+    <span><i style="background:#d3d8de"></i>sin registro</span>
+  </div>
+  <p class="muted" style="font-size:12.5px;margin:0 0 4px">
+    Pasá el mouse por cada barra para ver el detalle. Los días sin registro no son días de cero:
+    quedan fuera del acumulado y de los promedios.
+  </p>
+
+  <div class="cols" style="margin-top:22px">
+    <div>
+      <h3>Promedios diarios</h3>
+      <div class="framed"><table><tbody>
+        <tr><td>Ingesta</td><td class="num">${f0(M.ingestaMedia)} kcal</td></tr>
+        <tr><td>Proteína</td><td class="num">${f0(M.pMedia)} g</td></tr>
+        <tr><td>Carbohidratos</td><td class="num">${f0(M.cMedia)} g</td></tr>
+        <tr><td>Grasa</td><td class="num">${f0(M.gMedia)} g</td></tr>
+        <tr><td>Comida de afuera</td>
+            <td class="num">${M.diasAfuera} días · ${Math.round(M.pctAfuera*100)} % de las kcal</td></tr>
+      </tbody></table></div>
+    </div>
+    <div>
+      <h3>Entrenamiento</h3>
+      <div class="framed"><table><tbody>
+        ${["gym","cardio","deporte"].map(t => {
+          const x = M.porTipo[t];
+          return `<tr><td>${t.charAt(0).toUpperCase()+t.slice(1)}</td>
+            <td class="num">${x ? x.n + (x.n===1?" sesión":" sesiones") : "—"}</td>
+            <td class="num">${x ? f0(x.kcal)+" kcal" : ""}</td></tr>`;
+        }).join("")}
+        <tr><td>Días sin ninguna actividad</td>
+            <td class="num">${M.diasSinActividad}</td><td class="num">de ${M.diasConRegistro}</td></tr>
+      </tbody></table></div>
+    </div>
+  </div>
+
+  <h2>¿Coincide el registro con la báscula?</h2>
+  <div class="card">
+    <div class="formula" style="margin-bottom:10px">
+      grasa perdida estimada por el déficit registrado = ${f0(M.acumulado)} / 7700 =
+      <b>${f2(M.grasaEstimada)} kg</b><br>
+      grasa perdida medida entre las mediciones del período =
+      <b>${M.grasaMedida !== null ? f2(M.grasaMedida)+" kg" : "no hay dos mediciones en el rango"}</b>
+    </div>
+    ${mostrarContraste ? `
+      <div class="note ${Math.abs(disc) < 0.15 ? "ok" : "bad"}">
+        <b>Discrepancia ${disc>=0?"+":""}${f2(disc)} kg</b>
+        ${Math.abs(disc) < 0.15
+          ? "El modelo está calibrado: lo que registrás explica lo que marca la báscula."
+          : disc > 0
+            ? "Estás perdiendo menos de lo que el registro predice. Lo más probable es que las porciones estén subestimadas o el gasto sobreestimado."
+            : "Estás perdiendo más de lo previsto. Vale revisar que parte de eso no sea masa magra."}
+      </div>`
+    : `<div class="note bad">
+        <b>No se puede comparar todavía</b>
+        ${M.grasaMedida === null
+          ? "Hacen falta al menos dos mediciones dentro del período elegido."
+          : `Cobertura ${Math.round(M.cobertura*100)} %: por debajo del 50 % la estimación se apoya en
+             muy pocos días y compararla induce a error.`}
+      </div>`}
+  </div>
+
+  <h2>Progreso hacia el ${S.objPct} %</h2>
+  <div style="max-width:560px">
+    <div class="macrobar" style="height:12px">
+      <span style="width:${pctProg}%;background:#1d7a4f"></span>
+    </div>
+    <div class="row" style="justify-content:space-between;margin-top:6px">
+      <span class="muted" style="font-size:12.5px">
+        ${f2(yaPerdido)} de ${f2(totalPerder)} kg desde el 20 de marzo</span>
+      <span style="font-size:12.5px;font-weight:600">${Math.round(pctProg)} %</span>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 0">Faltan ${f2(GRASA_KG - objetivoKg)} kg de grasa.</p>
+  </div>`;
+}
+
+// =========================================================================
+// P2 — Actividad
+// =========================================================================
+function vistaActividad() {
+  return `
+  <h1>Actividad y gasto energético</h1>
+  <p class="sub">La planilla partía de 2250 kcal fijas y le sumaba el entrenamiento encima,
+  pero esas 2250 ya incluían actividad: el gym se contaba dos veces. Acá el gasto se arma
+  por capas y cada capa se ve.</p>
+
+  <div class="stats" style="margin-bottom:20px">
+    <div class="stat"><div class="v">${f0(BMR)}</div><div class="l">Metabolismo basal</div></div>
+    <div class="stat"><div class="v">${f0(GASTO_BASE)}</div><div class="l">Día sin entrenar</div></div>
+    <div class="stat"><div class="v">${f0(GASTO_BASE + 330)}</div><div class="l">Día de gym</div></div>
+    <div class="stat"><div class="v warn">2 250</div><div class="l">Lo que asumía el Excel</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:22px">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <h3 style="margin:0">Cómo se calcula</h3>
+      <span class="chip" style="cursor:default">Katch-McArdle</span>
+    </div>
+    <div class="formula">
+      masa magra = ${ACTUAL.peso} × (1 − ${ACTUAL.gp}/100) = <b>${f2(MAGRA)} kg</b><br>
+      BMR = 370 + 21.6 × ${f2(MAGRA)} = <b>${f0(BMR)} kcal</b><br>
+      gasto sin deporte = ${f0(BMR)} × ${FACTOR} = <b>${f0(GASTO_BASE)} kcal</b>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin:10px 0 0">
+      Se usa esta fórmula y no Mifflin-St Jeor porque hay medición de composición corporal:
+      partir de la masa magra es más fiel que partir del peso total. Se recalcula con cada
+      medición nueva, así que nunca queda un número viejo fijo.
+    </p>
+  </div>
+
+  <div class="row" style="justify-content:space-between;margin:26px 0 10px">
+    <h2 style="margin:0">Catálogo de actividades</h2>
+    <button data-editact="nueva">+ Nueva actividad</button>
+  </div>
+  ${S.editAct ? formActividad() : ""}
+  <div class="framed">
+    <table>
+      <thead><tr><th>Actividad</th><th>Tipo</th><th class="num">kcal</th>
+      <th class="num">Gasto del día</th><th class="num">Sesiones</th><th></th></tr></thead>
+      <tbody>${ACTIVIDADES.map(a => {
+        const usos = SESIONES.filter(s => s.act === a.id).length;
+        return `<tr>
+          <td>${esc(a.n)}</td><td class="muted">${a.tipo}</td>
+          <td class="num">${a.kcal}</td><td class="num">${f0(GASTO_BASE + a.kcal)}</td>
+          <td class="num muted">${usos || "—"}</td>
+          <td class="num"><button class="ghost" data-editact="${a.id}" title="Editar">✎</button></td></tr>`;
+      }).join("")}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="font-size:12.5px">Las kcal las definís vos: son un dato de entrada, no
+  un cálculo. Editar una actividad no cambia las sesiones ya registradas, porque el valor se copia
+  al registrar. En la pantalla Hoy podés además ajustar las kcal de una sesión puntual sin tocar
+  el catálogo.</p>`;
+}
+
+function formActividad() {
+  const nueva = S.editAct === "nueva";
+  const a = nueva ? { n:"", tipo:"gym", kcal:300, min:60 } : ACTIVIDADES.find(x => x.id === S.editAct);
+  const usos = nueva ? 0 : SESIONES.filter(s => s.act === S.editAct).length;
+  return `
+  <div class="card" style="margin-bottom:12px;max-width:560px">
+    <h3>${nueva ? "Nueva actividad" : "Editar actividad"}</h3>
+    <div class="row" style="margin-bottom:9px">
+      <label class="muted" style="width:90px">Nombre</label>
+      <input type="text" id="actN" value="${esc(a.n)}" style="max-width:330px" placeholder="Ej. Día 5 — Hombro">
+    </div>
+    <div class="row" style="margin-bottom:9px">
+      <label class="muted" style="width:90px">Tipo</label>
+      <select id="actT" style="width:150px">
+        ${["gym","cardio","deporte"].map(t => `<option ${t===a.tipo?"selected":""}>${t}</option>`).join("")}
+      </select>
+    </div>
+    <div class="row" style="margin-bottom:9px">
+      <label class="muted" style="width:90px">kcal</label>
+      <input type="number" id="actK" value="${a.kcal}" style="width:110px">
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <label class="muted" style="width:90px">Minutos</label>
+      <input type="number" id="actM" value="${a.min || 60}" style="width:110px">
+      <span class="muted" style="font-size:12px">opcional</span>
+    </div>
+    ${usos ? `<div class="note plain" style="margin-bottom:12px">
+      Esta actividad se usó en ${usos} ${usos===1?"sesión":"sesiones"}. Cambiar las kcal no las modifica.
+    </div>` : ""}
+    <div class="row">
+      <button data-cancelact="1">Cancelar</button>
+      <button data-guardaract="${S.editAct}" style="border-color:#2f6fd0;color:#2f6fd0">Guardar</button>
+      ${nueva ? "" : `<button class="ghost" data-borraract="${S.editAct}">Eliminar</button>`}
+    </div>
+  </div>`;
+}
+
+// =========================================================================
+// P3 — Objetivo
+// =========================================================================
+function vistaObjetivo() {
+  const P = plan(S.objPct, S.semanas);
+  const C = calibracion();
+  const cobertura = C.diasConRegistro / C.dias;
+
+  // proyeccion semana a semana
+  const pts = [];
+  for (let s = 0; s <= S.semanas; s++)
+    pts.push(Math.max(P.grasaObj, GRASA_KG - P.diario * 7 * s / KCAL_GRASA));
+  const W=560, H=170, PAD=34;
+  const lo = Math.min(...pts, P.grasaObj) - .3, hi = Math.max(...pts) + .3;
+  const X = i => PAD + i * (W - PAD - 14) / S.semanas;
+  const Y = v => H - 22 - (v - lo) / (hi - lo) * (H - 46);
+  const line = pts.map((v,i) => `${i?"L":"M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+
+  return `
+  <h1>Objetivo</h1>
+  <p class="sub">Es la pregunta que la planilla no puede contestar, porque las kcal y las
+  mediciones viven en hojas que no se hablan. El cálculo asume que mantenés la masa magra:
+  el escenario deseable y el único que no obliga a adivinar cuánto músculo perderías.</p>
+
+  <div class="row" style="margin-bottom:20px">
+    <label class="muted" style="font-size:12px">Grasa objetivo</label>
+    <select id="objPct">${[12,13,14,15,16,17].map(v =>
+      `<option ${v===S.objPct?"selected":""}>${v}</option>`).join("")}</select>
+    <label class="muted" style="font-size:12px;margin-left:12px">Plazo</label>
+    <select id="semanas">${[4,6,8,10,12,16].map(v =>
+      `<option ${v===S.semanas?"selected":""}>${v}</option>`).join("")}</select>
+    <span class="muted" style="font-size:12px">semanas</span>
+  </div>
+
+  ${P.aPerder <= 0
+    ? `<div class="note ok"><b>Objetivo alcanzado</b>Ya estás en o por debajo del ${S.objPct} % de grasa.</div>`
+    : `
+  <div class="stats" style="margin-bottom:18px">
+    <div class="stat"><div class="v">${f1(P.pesoObj)} kg</div><div class="l">Peso al llegar</div></div>
+    <div class="stat"><div class="v">${f2(P.aPerder)} kg</div><div class="l">Grasa por perder</div></div>
+    <div class="stat"><div class="v">${f0(P.kcal)}</div><div class="l">kcal totales</div></div>
+    <div class="stat"><div class="v ${P.seguro?"ok":"bad"}">${f0(P.diario)}</div><div class="l">Déficit diario necesario</div></div>
+  </div>
+
+  <div class="note ${P.seguro?"ok":"bad"}" style="margin-bottom:22px">
+    <b>${P.seguro ? "El plazo es sostenible" : "Plazo demasiado agresivo"}</b>
+    ${f0(P.diario)} kcal/día ${P.seguro ? "está por debajo" : "supera"} el techo de ${f0(P.techo)} kcal,
+    que es el menor entre un cuarto de tu gasto y 0.75 % del peso por semana.
+    ${P.seguro ? "Con este déficit conservás el músculo que ganaste."
+               : "A esa velocidad parte de lo que se va es músculo, y venías ganándolo. Conviene estirar el plazo."}
+  </div>
+
+  <h2>Masa grasa proyectada</h2>
+  <svg width="${W}" height="${H}" style="max-width:100%">
+    <line x1="${PAD}" y1="${Y(P.grasaObj)}" x2="${W-14}" y2="${Y(P.grasaObj)}"
+          stroke="#1d7a4f" stroke-dasharray="4 3"/>
+    <text x="${W-14}" y="${Y(P.grasaObj)-5}" text-anchor="end" fill="#1d7a4f">objetivo ${S.objPct} % · ${f2(P.grasaObj)} kg</text>
+    <path d="${line}" fill="none" stroke="#2f6fd0" stroke-width="2"/>
+    ${pts.map((v,i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2.5" fill="#2f6fd0"/>`).join("")}
+    <text x="4" y="${Y(pts[0])+4}">${f2(pts[0])}</text>
+    <text x="${PAD}" y="${H-6}">hoy</text>
+    <text x="${W-14}" y="${H-6}" text-anchor="end">semana ${S.semanas}</text>
+  </svg>`}
+
+  <h2>Tu gasto real, calibrado con tus datos</h2>
+  <div class="card">
+    <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+      Período ${C.desde} → ${C.hasta} · ${C.dias} días · cobertura de registro ${Math.round(cobertura*100)} %
+    </p>
+    <div class="formula">
+      grasa perdida ${f2(C.dGrasa)} kg → ${f0(C.dGrasa*KCAL_GRASA)} kcal liberadas<br>
+      músculo ganado ${f2(C.dMusc)} kg → −${f0(C.dMusc*KCAL_MUSCULO)} kcal invertidas<br>
+      déficit real = ${f0(C.energia)} / ${C.dias} = <b>${f0(C.diario)} kcal/día</b>
+    </div>
+    <div class="note bad" style="margin-top:12px">
+      <b>Cobertura baja</b>
+      Solo ${C.diasConRegistro} de ${C.dias} días tienen ingesta registrada, así que el número es
+      indicativo. Con cuatro semanas de registro continuo se vuelve confiable y reemplaza a la fórmula.
+    </div>
+  </div>
+
+  <h2>Comparación con la planilla</h2>
+  <div class="framed">
+    <table>
+      <thead><tr><th></th><th class="num">Planilla</th><th class="num">Esta app</th></tr></thead>
+      <tbody>
+        <tr><td>Gasto en día sin entrenar</td><td class="num muted">2 250 fijas</td>
+            <td class="num">${f0(GASTO_BASE)} desde tu masa magra</td></tr>
+        <tr><td>Grasa para llegar al 15 %</td><td class="num muted">2.19 kg</td>
+            <td class="num">1.87 kg</td></tr>
+        <tr><td>Días sin datos</td><td class="num muted">2 250 de déficit</td>
+            <td class="num">sin registro</td></tr>
+        <tr><td>Déficit diario</td><td class="num muted">436 kcal</td>
+            <td class="num">${f0(C.diario)} kcal</td></tr>
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// =========================================================================
+// P4 — Mediciones
+// =========================================================================
+function vistaMediciones() {
+  const m26 = MEDICIONES.filter(m => m.f >= "2026-01-01");
+  let grafico = "";
+  if (m26.length >= 2) {
+    const W=620, H=200, PAD=40;
+    const gk = m26.map(m => m.peso * m.gp / 100);
+    const mk = m26.map(m => m.peso * m.mp / 100);
+    const lo = Math.min(...gk) - 1, hi = Math.max(...mk) + 1;
+    const t0 = new Date(m26[0].f).getTime(), t1 = new Date(m26[m26.length-1].f).getTime();
+    const span = (t1 - t0) || 1;
+    const X = f => PAD + (new Date(f).getTime() - t0) / span * (W - PAD - 20);
+    const Y = v => H - 24 - (v - lo) / ((hi - lo) || 1) * (H - 48);
+    const path = arr => arr.map((v,i) => `${i?"L":"M"}${X(m26[i].f).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+    grafico = `
+    <svg width="${W}" height="${H}" style="max-width:100%">
+      <path d="${path(mk)}" fill="none" stroke="#1d7a4f" stroke-width="2"/>
+      <path d="${path(gk)}" fill="none" stroke="#b4232f" stroke-width="2"/>
+      ${m26.map((m,i) => `
+        <circle cx="${X(m.f).toFixed(1)}" cy="${Y(mk[i]).toFixed(1)}" r="2.5" fill="#1d7a4f"><title>${m.f} · magra ${f2(mk[i])} kg</title></circle>
+        <circle cx="${X(m.f).toFixed(1)}" cy="${Y(gk[i]).toFixed(1)}" r="2.5" fill="#b4232f"><title>${m.f} · grasa ${f2(gk[i])} kg</title></circle>`).join("")}
+      <text x="4" y="${Y(mk[0])+4}" fill="#1d7a4f">magra</text>
+      <text x="4" y="${Y(gk[0])+4}" fill="#b4232f">grasa</text>
+      <text x="${PAD}" y="${H-6}">${m26[0].f}</text>
+      <text x="${W-20}" y="${H-6}" text-anchor="end">${m26[m26.length-1].f}</text>
+    </svg>`;
+  } else {
+    grafico = `<div class="note plain">Hacen falta al menos dos mediciones de 2026 para dibujar la evolución.</div>`;
+  }
+
+  return `
+  <div class="row" style="justify-content:space-between">
+    <h1>Mediciones</h1><button data-editmed="nueva">+ Nueva</button>
+  </div>
+  <p class="sub">Las columnas en kg son derivadas del peso y el porcentaje, no se ingresan.
+  Es lo que evita la inconsistencia que tenía la planilla, donde el mismo dato figuraba
+  como 12.158 y como 13.158.</p>
+  ${S.avisoRef ? `<div class="note ok" style="margin-bottom:12px"><b>Recalculado</b>${S.avisoRef}</div>` : ""}
+  ${S.borrarMed ? confirmarBorrado() : S.editMed ? formMedicion() : ""}
+
+  ${grafico}
+
+  <div class="framed" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Fecha</th><th class="num">Peso</th><th class="num">Grasa %</th>
+      <th class="num">Grasa kg</th><th class="num">Músculo %</th><th class="num">Músculo kg</th>
+      <th class="num">Visceral</th><th></th></tr></thead>
+      <tbody>${[...MEDICIONES].reverse().map((m, i) => `<tr>
+        <td>${m.f} ${i===0?'<span class="muted">· referencia</span>':""}</td>
+        <td class="num">${f1(m.peso)}</td><td class="num">${f1(m.gp)}</td>
+        <td class="num muted">${f2(m.peso*m.gp/100)}</td><td class="num">${f1(m.mp)}</td>
+        <td class="num muted">${f2(m.peso*m.mp/100)}</td><td class="num">${m.v}</td>
+        <td class="num" style="white-space:nowrap">
+          <button class="ghost" data-editmed="${m.f}" title="Editar">✎</button>
+          <button class="ghost" data-pedirborrarmed="${m.f}" title="Eliminar">🗑</button>
+        </td></tr>`).join("")}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="font-size:12.5px">La medición más reciente es la referencia: define el
+  metabolismo basal y el plan de objetivo. Editarla o eliminarla recalcula todo.</p>`;
+}
+
+function formMedicion() {
+  const nueva = S.editMed === "nueva";
+  const m = nueva ? { f:"2026-09-16", peso:72.0, gp:17.0, mp:42.3, v:7 }
+                  : MEDICIONES.find(x => x.f === S.editMed);
+  const esUltima = !nueva && m.f === ACTUAL.f;
+  return `
+  <div class="card" style="margin-bottom:14px;max-width:560px">
+    <h3>${nueva ? "Nueva medición" : "Editar medición"}</h3>
+    <div class="row" style="margin-bottom:9px">
+      <label class="muted" style="width:130px">Fecha</label>
+      <input type="date" id="medF" value="${m.f}" style="width:170px">
+    </div>
+    <div class="row" style="margin-bottom:9px">
+      <label class="muted" style="width:130px">Peso (kg)</label>
+      <input type="number" step="0.1" id="medP" value="${m.peso}" style="width:110px">
+    </div>
+    <div class="row" style="margin-bottom:9px">
+      <label class="muted" style="width:130px">Grasa (%)</label>
+      <input type="number" step="0.1" id="medG" value="${m.gp}" style="width:110px">
+      <span class="muted" style="font-size:12px">→ ${f2(m.peso*m.gp/100)} kg, derivado</span>
+    </div>
+    <div class="row" style="margin-bottom:9px">
+      <label class="muted" style="width:130px">Músculo (%)</label>
+      <input type="number" step="0.1" id="medM" value="${m.mp}" style="width:110px">
+      <span class="muted" style="font-size:12px">→ ${f2(m.peso*m.mp/100)} kg, derivado</span>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <label class="muted" style="width:130px">Grasa visceral</label>
+      <input type="number" step="1" id="medV" value="${m.v}" style="width:110px">
+    </div>
+    ${esUltima ? `<div class="note plain" style="margin-bottom:12px">
+      Es tu medición de referencia: cambiarla recalcula el gasto basal
+      (hoy ${f0(BMR)} kcal), el plan de objetivo y la calibración.
+    </div>` : ""}
+    <div class="row">
+      <button data-cancelmed="1">Cancelar</button>
+      <button data-guardarmed="${S.editMed}" style="border-color:#2f6fd0;color:#2f6fd0">Guardar</button>
+      ${nueva ? "" : `<button class="ghost" data-pedirborrarmed="${m.f}">Eliminar</button>`}
+    </div>
+  </div>`;
+}
+
+function confirmarBorrado() {
+  const m = MEDICIONES.find(x => x.f === S.borrarMed);
+  const esUltima = m.f === MEDICIONES[MEDICIONES.length-1].f;
+  const prev = MEDICIONES[MEDICIONES.length - 2];
+  const bmrNuevo = esUltima && prev
+    ? 370 + 21.6 * (prev.peso * (1 - prev.gp/100)) : null;
+  return `
+  <div class="card" style="margin-bottom:14px;max-width:560px;border-color:#f3ccd1">
+    <h3 style="color:#b4232f">¿Eliminar la medición del ${m.f}?</h3>
+    <p style="margin:0 0 10px">${f1(m.peso)} kg · ${f1(m.gp)} % grasa · ${f1(m.mp)} % músculo</p>
+    ${esUltima && prev ? `<div class="note bad" style="margin-bottom:12px">
+      Es la más reciente. La referencia pasará a ser la del ${prev.f}
+      (${f1(prev.peso)} kg, ${f1(prev.gp)} %), y el gasto basal cambiará
+      de ${f0(BMR)} a ${f0(bmrNuevo)} kcal.
+    </div>` : `<div class="note plain" style="margin-bottom:12px">
+      No es la medición de referencia, así que el gasto basal no cambia.
+    </div>`}
+    <div class="row">
+      <button data-cancelmed="1">Cancelar</button>
+      <button data-borrarmed="${m.f}" style="border-color:#b4232f;color:#b4232f">Eliminar</button>
+    </div>
+  </div>`;
+}
+
+// =========================================================================
+// P5 — Alimentos
+// =========================================================================
+// Resultados simulados: en la app real vienen de Open Food Facts, USDA y el modelo (D-09).
+const IA_MOCK = {
+  "tarta de jamon y queso": [
+    { n:"Tarta de jamón y queso", porc:"1 porción (150 g)", kcal:385, p:16.2, c:28.4, g:22.1,
+      fuente:"Open Food Facts", estimacion:false },
+    { n:"Tarta de jamón y queso, casera", porc:"1 porción (180 g)", kcal:460, p:19, c:32, g:26,
+      fuente:"estimación del modelo", estimacion:true },
+  ],
+  "sushi": [
+    { n:"Sushi, roll variado", porc:"8 piezas (200 g)", kcal:380, p:14, c:62, g:7,
+      fuente:"USDA FoodData Central", estimacion:false },
+  ],
+  "chivito": [
+    { n:"Chivito al pan completo", porc:"1 (400 g)", kcal:1180, p:52, c:78, g:68,
+      fuente:"estimación del modelo", estimacion:true },
+    { n:"Chivito canadiense", porc:"1 (450 g)", kcal:1400, p:58, c:82, g:85,
+      fuente:"estimación del modelo", estimacion:true },
+  ],
+  "ensalada cesar": [
+    { n:"Ensalada César con pollo", porc:"1 plato (300 g)", kcal:470, p:32, c:14, g:32,
+      fuente:"Open Food Facts", estimacion:false },
+    // caso deliberadamente incoherente, para mostrar la validacion de RN-10
+    { n:"Ensalada César, aderezo aparte", porc:"1 plato (280 g)", kcal:600, p:20, c:10, g:12,
+      fuente:"estimación del modelo", estimacion:true },
+  ],
+};
+
+// RN-10 — la validacion es aritmetica y no depende de confiar en la fuente.
+function validar(r) {
+  if (r.p === null) return { desvio:null, nivel:"sin macros" };
+  const calc = r.p * 4 + r.c * 4 + r.g * 9;
+  const desvio = Math.abs(calc - r.kcal) / r.kcal;
+  return { calc, desvio,
+           nivel: desvio <= 0.05 ? "ok" : desvio <= 0.15 ? "aviso" : "malo" };
+}
+
+function bloqueBusquedaIA() {
+  const dis = S.sinConexion;
+  return `
+  <div class="card" style="margin-bottom:22px">
+    <h3>Buscar información nutricional</h3>
+    <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+      Para alimentos que no son habituales. Consulta primero bases de datos abiertas
+      (Open Food Facts, USDA) y solo recurre a un modelo de lenguaje cuando no hay etiqueta,
+      como en platos de restaurante. Nada se guarda sin que lo confirmes.
+    </p>
+    <div class="row" style="margin-bottom:10px">
+      <input type="text" id="iaTexto" value="${esc(S.iaTexto)}" ${dis?"disabled":""}
+             placeholder="Ej. tarta de jamón y queso, chivito, sushi, ensalada césar"
+             style="max-width:390px">
+      <button data-iabuscar="1" ${dis?"disabled":""}>${S.iaBuscando ? "Buscando…" : "Buscar"}</button>
+      <label class="muted" style="font-size:12px;margin-left:8px">
+        <input type="checkbox" id="simOffline" ${dis?"checked":""}> simular sin conexión
+      </label>
+    </div>
+
+    ${dis ? `<div class="note bad">
+      <b>Sin conexión</b>
+      La búsqueda asistida no está disponible, pero podés cargar el alimento a mano con normalidad.
+      Ninguna función esencial depende de internet.
+    </div>` : S.iaResultados === null ? "" : S.iaResultados.length === 0 ? `
+    <div class="note plain">
+      Sin resultados para “${esc(S.iaTexto)}”. Podés darlo de alta a mano con ese nombre ya puesto.
+      <div class="row" style="margin-top:8px"><button>Alta manual</button></div>
+    </div>` : `
+    <p class="muted" style="font-size:12px;margin:0 0 8px">
+      Consultado: Open Food Facts ✓ · USDA ✓ · modelo de lenguaje ✓
+    </p>
+    ${S.iaResultados.map((r, i) => {
+      const v = validar(r);
+      return `
+      <div style="border:1px solid ${v.nivel==="malo"?"#f3ccd1":"var(--line)"};border-radius:7px;
+                  padding:11px 13px;margin-bottom:8px">
+        <div class="row" style="justify-content:space-between">
+          <b>${esc(r.n)}</b>
+          <span class="chip" style="cursor:default;font-size:11.5px">${esc(r.fuente)}</span>
+        </div>
+        <div class="formula" style="margin:5px 0">
+          ${esc(r.porc)} · ${r.kcal} kcal · P ${f1(r.p)} · C ${f1(r.c)} · G ${f1(r.g)}
+        </div>
+        <div style="font-size:12.5px;margin-bottom:8px" class="${
+          v.nivel==="ok"?"ok":v.nivel==="aviso"?"warn":"bad"}">
+          ${v.nivel==="ok"
+            ? `✓ Coherente: los macros dan ${f0(v.calc)} kcal, ${(v.desvio*100).toFixed(1)} % de desvío`
+            : v.nivel==="aviso"
+              ? `⚠ Desvío ${(v.desvio*100).toFixed(0)} %: los macros dan ${f0(v.calc)} kcal y declara ${r.kcal}`
+              : `✕ No confiable: los macros dan ${f0(v.calc)} kcal pero declara ${r.kcal},
+                 ${(v.desvio*100).toFixed(0)} % de desvío. Revisalo antes de aceptar`}
+        </div>
+        ${r.estimacion ? `<p class="muted" style="font-size:12px;margin:0 0 8px">
+          Es una estimación de un modelo, no una etiqueta.</p>` : ""}
+        <button data-iausar="${i}">Usar este</button>
+      </div>`;
+    }).join("")}
+    <p class="muted" style="font-size:12px;margin:0">
+      Al elegir uno se abre el alta con los campos cargados y editables. El guardado es un
+      segundo paso deliberado.
+    </p>`}
+  </div>`;
+}
+
+function vistaAlimentos() {
+  const fila = a => `<tr>
+    <td>${esc(a.n)}</td><td class="muted">${esc(a.porc)}</td>
+    <td class="num">${a.kcal}</td>
+    <td class="num">${a.p===null?'<span class="dash">—</span>':f1(a.p)}</td>
+    <td class="num">${a.c===null?'<span class="dash">—</span>':f1(a.c)}</td>
+    <td class="num">${a.g===null?'<span class="dash">—</span>':f1(a.g)}</td>
+    <td class="muted" style="font-size:12px">${esc(a.origen || "plantilla")}</td></tr>`;
+  return `
+  <div class="row" style="justify-content:space-between">
+    <h1>Alimentos</h1>
+    <div class="row"><button>+ Nuevo manual</button></div>
+  </div>
+  <p class="sub">Los macros de este catálogo se copian al registrar una comida, así que editar
+  un alimento nunca cambia los días ya cargados. Los guiones son macros desconocidos, distinto
+  de cero: es lo que evita subestimar la proteína en los días de comida afuera.</p>
+
+  ${bloqueBusquedaIA()}
+
+  <div class="framed">
+    <table>
+      <thead><tr><th>Alimento</th><th>Porción</th><th class="num">kcal</th>
+      <th class="num">P</th><th class="num">C</th><th class="num">G</th><th>Origen</th></tr></thead>
+      <tbody>
+        ${ALIMENTOS.map(fila).join("")}
+        <tr class="grp"><td colspan="7">De afuera — solo kcal</td></tr>
+        ${AFUERA.map(fila).join("")}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="font-size:12.5px">La columna Origen deja trazado de dónde salió cada
+  cifra, para poder auditarla después.</p>
+
+  <h2>Combos</h2>
+  <div class="framed">
+    <table>
+      <thead><tr><th>Combo</th><th>Composición</th><th class="num">kcal</th></tr></thead>
+      <tbody>${COMBOS.map(c => `<tr>
+        <td>${esc(c.n)}</td>
+        <td class="muted">${c.items.map(id => esc(byId(id).n)).join(" + ")}</td>
+        <td class="num">${c.items.reduce((s,id) => s + byId(id).kcal, 0)}</td></tr>`).join("")}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// =========================================================================
+// P6 — Ajustes
+// =========================================================================
+function vistaAjustes() {
+  return `
+  <h1>Ajustes</h1>
+  <p class="sub">Los tres campos del perfil que faltan definir (altura, fecha de nacimiento y
+  sexo) solo se usan para la fórmula de respaldo, cuando una medición no trae porcentaje de grasa.</p>
+
+  <h2>Perfil</h2>
+  <div class="card" style="max-width:520px">
+    <div class="row" style="margin-bottom:10px">
+      <label style="width:170px" class="muted">Altura (cm)</label>
+      <input type="number" value="178" style="width:110px">
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <label style="width:170px" class="muted">Fecha de nacimiento</label>
+      <input type="date" value="1990-01-01" style="width:170px">
+    </div>
+    <div class="row" style="margin-bottom:16px">
+      <label style="width:170px" class="muted">Sexo</label>
+      <select style="width:150px"><option>Masculino</option><option>Femenino</option></select>
+    </div>
+    <h3>Actividad fuera del gym</h3>
+    <div style="line-height:2">
+      <label><input type="radio" name="fa" checked> Sedentario, trabajo de escritorio <span class="muted">× 1.2</span></label><br>
+      <label><input type="radio" name="fa"> Algo de movimiento diario <span class="muted">× 1.35</span></label><br>
+      <label><input type="radio" name="fa"> Trabajo de pie o muy activo <span class="muted">× 1.5</span></label>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin:8px 0 0">
+      El entrenamiento no entra acá: se registra por día en la pantalla Hoy.
+    </p>
+  </div>
+
+  <h2>Objetivo</h2>
+  <div class="card" style="max-width:520px">
+    <div class="row" style="margin-bottom:10px">
+      <label style="width:170px" class="muted">Grasa corporal objetivo</label>
+      <input type="number" value="15" style="width:90px"> <span class="muted">%</span>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <label style="width:170px" class="muted">Plazo</label>
+      <input type="number" value="8" style="width:90px"> <span class="muted">semanas</span>
+    </div>
+    <div class="row">
+      <label style="width:170px" class="muted">Proteína diaria objetivo</label>
+      <input type="number" value="130" style="width:90px"> <span class="muted">g</span>
+    </div>
+  </div>
+
+  <h2>Tipos y categorías</h2>
+  <p class="sub">Nada de esto viene fijo. En la versión anterior del diseño eran valores
+  en el código; ahora son datos tuyos: renombrá, reordená o desactivá lo que no uses.
+  Desactivar no toca los registros históricos.</p>
+
+  <div class="cols">
+    <div>
+      <div class="row" style="justify-content:space-between;margin-bottom:6px">
+        <h3 style="margin:0">Tipos de comida</h3><button class="chip" style="cursor:default">+</button>
+      </div>
+      <div class="framed"><table><tbody>
+        ${TIPOS_COMIDA.map((t, i) => `<tr>
+          <td class="muted" style="width:26px">⣿</td><td class="num muted" style="width:22px">${i+1}</td>
+          <td>${esc(t)}</td><td class="num muted" style="font-size:12px">activo</td>
+          <td class="num"><button class="ghost" title="Editar">✎</button></td></tr>`).join("")}
+      </tbody></table></div>
+      <p class="muted" style="font-size:12px;margin:5px 0 0">Arrastrá para reordenar.</p>
+    </div>
+    <div>
+      <div class="row" style="justify-content:space-between;margin-bottom:6px">
+        <h3 style="margin:0">Grupos musculares</h3><button class="chip" style="cursor:default">+</button>
+      </div>
+      <div class="framed"><table><tbody>
+        ${GRUPOS.map(t => `<tr>
+          <td class="muted" style="width:26px">⣿</td><td>${esc(t)}</td>
+          <td class="num muted" style="font-size:12px">${EJERCICIOS.filter(e=>e.gm===t).length} ejerc.</td>
+          <td class="num"><button class="ghost" title="Editar">✎</button></td></tr>`).join("")}
+      </tbody></table></div>
+    </div>
+  </div>
+
+  <div class="cols" style="margin-top:14px">
+    <div>
+      <div class="row" style="justify-content:space-between;margin-bottom:6px">
+        <h3 style="margin:0">Tipos de actividad</h3><button class="chip" style="cursor:default">+</button>
+      </div>
+      <div class="framed"><table><tbody>
+        ${TIPOS_ACTIVIDAD.map(t => `<tr>
+          <td class="muted" style="width:26px">⣿</td><td>${esc(t)}</td>
+          <td class="num muted" style="font-size:12px">${ACTIVIDADES.filter(a=>a.tipo===t).length} activ.</td>
+          <td class="num"><button class="ghost" title="Editar">✎</button></td></tr>`).join("")}
+      </tbody></table></div>
+    </div>
+    <div>
+      <div class="row" style="justify-content:space-between;margin-bottom:6px">
+        <h3 style="margin:0">Categorías de alimento</h3><button class="chip" style="cursor:default">+</button>
+      </div>
+      <div class="framed"><table><tbody>
+        ${CATEGORIAS.map(t => `<tr>
+          <td class="muted" style="width:26px">⣿</td><td>${esc(t)}</td>
+          <td class="num"><button class="ghost" title="Editar">✎</button></td></tr>`).join("")}
+      </tbody></table></div>
+    </div>
+  </div>
+
+  <h2>Cálculo</h2>
+  <p class="sub">Estos valores afectan todos los cálculos. Los de fábrica son los más aceptados;
+  cambialos solo si tenés un motivo.</p>
+
+  <div class="card" style="max-width:640px">
+    <h3>Metabolismo basal</h3>
+    <div style="line-height:2.1;margin-bottom:6px">
+      <label><input type="radio" name="bmr" checked> Katch-McArdle
+        <span class="muted">— usa tu masa magra medida</span>
+        <b style="margin-left:8px">${f0(370 + 21.6 * MAGRA)} kcal</b></label><br>
+      <label><input type="radio" name="bmr"> Mifflin-St Jeor
+        <span class="muted">— usa peso, altura, edad y sexo</span>
+        <b style="margin-left:8px">${f0(10*ACTUAL.peso + 6.25*CFG.alturaCm - 5*36 + 5)} kcal</b></label><br>
+      <label><input type="radio" name="bmr"> Valor medido, lo ingreso yo:
+        <input type="number" placeholder="1720" style="width:90px"> <span class="muted">kcal</span></label>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin:0">
+      Ahora se usa Katch-McArdle sobre la medición del ${ACTUAL.f}.
+      Si esa medición no tuviera % de grasa, caería a Mifflin-St Jeor y se avisaría.
+    </p>
+  </div>
+
+  <div class="card" style="max-width:640px">
+    <h3>Constantes fisiológicas</h3>
+    <table><tbody>
+      <tr><td>kcal por kilo de grasa corporal</td>
+          <td class="num"><input type="number" value="${CFG.kcalPorKgGrasa}" style="width:90px"></td>
+          <td class="muted" style="font-size:12px">de fábrica 7700</td></tr>
+      <tr><td>kcal por kilo de tejido magro</td>
+          <td class="num"><input type="number" value="${CFG.kcalPorKgMagro}" style="width:90px"></td>
+          <td class="muted" style="font-size:12px">de fábrica 1500</td></tr>
+    </tbody></table>
+  </div>
+
+  <div class="card" style="max-width:640px">
+    <h3>Límites de seguridad del déficit</h3>
+    <table><tbody>
+      <tr><td>Máximo % del gasto diario</td>
+          <td class="num"><input type="number" value="25" style="width:80px"> %</td>
+          <td class="muted" style="font-size:12px">de fábrica 25 %</td></tr>
+      <tr><td>Máximo % del peso por semana</td>
+          <td class="num"><input type="number" step="0.05" value="0.75" style="width:80px"> %</td>
+          <td class="muted" style="font-size:12px">de fábrica 0.75 %</td></tr>
+    </tbody></table>
+    <p class="muted" style="font-size:12.5px;margin:8px 0 0">
+      Con tus datos, el techo queda en <b>${f0(plan(S.objPct, S.semanas).techo)} kcal/día</b>.
+    </p>
+  </div>
+
+  <div class="card" style="max-width:640px">
+    <h3>Umbrales de confiabilidad</h3>
+    <table><tbody>
+      <tr><td>Cobertura mínima para comparar con la báscula</td>
+          <td class="num"><input type="number" value="50" style="width:80px"> %</td></tr>
+      <tr><td>Cobertura mínima para usar el gasto calibrado</td>
+          <td class="num"><input type="number" value="70" style="width:80px"> %</td></tr>
+    </tbody></table>
+    <div class="row" style="margin-top:12px">
+      <button class="chip" style="cursor:default">Restaurar valores de fábrica</button>
+      <button style="border-color:#2f6fd0;color:#2f6fd0">Guardar cambios</button>
+    </div>
+  </div>
+
+  <h2>Cuenta</h2>
+  <div class="card" style="max-width:640px">
+    <table><tbody>
+      <tr><td class="muted">Correo</td><td>${esc(CUENTA.email)}</td></tr>
+      <tr><td class="muted">Cuenta creada</td><td>2026-09-16</td></tr>
+    </tbody></table>
+
+    <h3 style="margin-top:16px">Contraseña</h3>
+    <div class="row" style="margin-bottom:10px">
+      <input type="password" placeholder="Actual" style="width:130px">
+      <input type="password" placeholder="Nueva" style="width:130px">
+      <input type="password" placeholder="Repetir" style="width:130px">
+      <button class="chip" style="cursor:default">Cambiar</button>
+    </div>
+
+    <h3>Tus datos</h3>
+    <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+      ${DIAS.length} días con comidas · ${SESIONES_GYM.length} sesiones de gym ·
+      ${SESIONES_CARDIO.length} de cardio · ${MEDICIONES.length} mediciones ·
+      ${ALIMENTOS.length + AFUERA.length} alimentos · ${EJERCICIOS.length} ejercicios
+    </p>
+    <p class="formula" style="margin:0 0 10px">%LOCALAPPDATA%\\kcal-tracker\\kcal.db</p>
+    <div class="row" style="margin-bottom:16px">
+      <button>Exportar todo a JSON</button>
+      <button>Importar desde JSON</button>
+      <button>Importar plantillas</button>
+    </div>
+
+    <h3 style="color:#b4232f">Eliminar la cuenta</h3>
+    <p class="muted" style="font-size:12.5px;margin:0 0 8px">
+      Se borra todo y no hay vuelta atrás. Exportá antes si querés guardarlo.
+    </p>
+    <div class="row">
+      <input type="text" placeholder="Escribí tu correo para confirmar" style="width:260px">
+      <button style="border-color:#b4232f;color:#b4232f">Eliminar mi cuenta</button>
+    </div>
+  </div>`;
+}
+
+// =========================================================================
+// Render y eventos
+// =========================================================================
+const VISTAS = { dashboard:vistaDashboard, hoy:vistaHoy, actividad:vistaActividad,
+                 objetivo:vistaObjetivo, mediciones:vistaMediciones,
+                 alimentos:vistaAlimentos, ajustes:vistaAjustes,
+                 rutinas:vistaRutinas, gym:vistaGym, cardio:vistaCardio };
+
+function render() {
+  document.getElementById("nav").innerHTML = SECCIONES.map(s => s.g
+    ? `<div class="navgrupo">${esc(s.g)}</div>`
+    : `<a class="${s.id===S.seccion?"on":""}" data-sec="${s.id}">${esc(s.t)}</a>`).join("");
+  document.getElementById("sidefoot").innerHTML = `
+    <b>${esc(CUENTA.nombre)}</b><br>
+    <span style="font-size:11.5px">${esc(CUENTA.email)}</span><br><br>
+    ${f1(ACTUAL.peso)} kg · ${f1(ACTUAL.gp)} %<br>
+    Objetivo: ${S.objPct} %<br>
+    Faltan <b>${f2(GRASA_KG - plan(S.objPct, S.semanas).grasaObj)} kg</b> de grasa`;
+  document.getElementById("main").innerHTML = VISTAS[S.seccion]();
+}
+
+const SEL = "[data-sec],[data-combo],[data-add],[data-act],[data-quitar],[data-vaciar]," +
+            "[data-per],[data-editact],[data-cancelact],[data-guardaract],[data-borraract]," +
+            "[data-editmed],[data-cancelmed],[data-guardarmed],[data-pedirborrarmed]," +
+            "[data-borrarmed],[data-iabuscar],[data-iausar]," +
+            "[data-rutina],[data-sesiondia],[data-entrenar],[data-ejsel]";
+
+document.addEventListener("click", e => {
+  const t = e.target.closest(SEL);
+  if (!t) return;
+  const d = t.dataset;
+  const val = id => document.getElementById(id)?.value;
+
+  if (d.sec)   { S.seccion = d.sec; S.busqueda = "";
+                 S.editAct = S.editMed = S.borrarMed = S.avisoRef = null; }
+  if (d.per)   { S.periodo = d.per; }
+  if (d.combo) {
+    const c = COMBOS.find(x => x.id === d.combo);
+    S.comidas[c.tipo] = [...(S.comidas[c.tipo] || []), ...c.items];
+  }
+  if (d.add)   { S.comidas[S.tipoActivo] = [...(S.comidas[S.tipoActivo] || []), d.add]; }
+  if (d.act)   { S.acts = S.acts.includes(d.act) ? S.acts.filter(x => x !== d.act) : [...S.acts, d.act]; }
+  if (d.quitar) {
+    const [tipo, i] = d.quitar.split(":");
+    S.comidas[tipo] = S.comidas[tipo].filter((_, j) => j !== +i);
+  }
+  if (d.vaciar) { S.comidas = {}; }
+
+  // ---- gym ----
+  if (d.rutina)    { S.rutina = d.rutina; }
+  if (d.sesiondia) { S.sesionDia = d.sesiondia; S.ejSel = null; }
+  if (d.entrenar)  { S.sesionDia = d.entrenar; S.ejSel = null; S.seccion = "gym"; }
+  if (d.ejsel)     { e.preventDefault(); S.ejSel = d.ejsel; }
+
+  // ---- catalogo de actividades ----
+  if (d.editact)   { S.editAct = d.editact; }
+  if (d.cancelact) { S.editAct = null; }
+  if (d.guardaract) {
+    const datos = { n: val("actN") || "Actividad sin nombre", tipo: val("actT"),
+                    kcal: +val("actK") || 0, min: +val("actM") || null };
+    if (d.guardaract === "nueva") {
+      ACTIVIDADES.push({ id: "a" + Date.now(), ...datos });
+    } else {
+      Object.assign(ACTIVIDADES.find(x => x.id === d.guardaract), datos);
+    }
+    S.editAct = null;
+  }
+  if (d.borraract) {
+    const i = ACTIVIDADES.findIndex(x => x.id === d.borraract);
+    if (i >= 0) ACTIVIDADES.splice(i, 1);
+    S.acts = S.acts.filter(x => x !== d.borraract);
+    S.editAct = null;
+  }
+
+  // ---- mediciones ----
+  if (d.editmed)        { S.editMed = d.editmed; S.borrarMed = null; }
+  if (d.cancelmed)      { S.editMed = null; S.borrarMed = null; }
+  if (d.pedirborrarmed) { S.borrarMed = d.pedirborrarmed; S.editMed = null; }
+  if (d.borrarmed) {
+    const i = MEDICIONES.findIndex(x => x.f === d.borrarmed);
+    if (i >= 0) MEDICIONES.splice(i, 1);
+    S.borrarMed = null;
+    recalcularReferencia();
+  }
+  if (d.guardarmed) {
+    const datos = { f: val("medF"), peso: +val("medP"), gp: +val("medG"),
+                    mp: +val("medM"), v: +val("medV") };
+    if (d.guardarmed === "nueva") {
+      const dup = MEDICIONES.find(x => x.f === datos.f);
+      if (dup) Object.assign(dup, datos); else MEDICIONES.push(datos);
+    } else {
+      Object.assign(MEDICIONES.find(x => x.f === d.guardarmed), datos);
+    }
+    MEDICIONES.sort((a, b) => a.f.localeCompare(b.f));
+    S.editMed = null;
+    recalcularReferencia();
+  }
+
+  // ---- busqueda asistida ----
+  if (d.iabuscar) {
+    const q = (S.iaTexto || "").trim().toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const key = Object.keys(IA_MOCK).find(k => k.includes(q) || q.includes(k));
+    S.iaResultados = q ? (key ? IA_MOCK[key] : []) : null;
+  }
+  if (d.iausar) {
+    const r = S.iaResultados[+d.iausar];
+    ALIMENTOS.push({ id:"n"+Date.now(), n:r.n, porc:r.porc, kcal:r.kcal,
+                     p:r.p, c:r.c, g:r.g, origen:r.fuente });
+    CAT.push(ALIMENTOS[ALIMENTOS.length-1]);
+    S.iaResultados = null; S.iaTexto = "";
+  }
+  render();
+});
+
+function recalcularReferencia() {
+  if (!MEDICIONES.length) return;
+  const bmrAnterior = BMR, refAnterior = ACTUAL.f;
+  recalcular();
+  S.avisoRef = (refAnterior !== ACTUAL.f || Math.abs(bmrAnterior - BMR) > 0.5)
+    ? `Referencia: medición del ${ACTUAL.f}. El gasto basal pasó de ${f0(bmrAnterior)} a ${f0(BMR)} kcal, `
+      + `y el plan de objetivo se recalculó.`
+    : null;
+}
+
+document.addEventListener("change", e => {
+  if (e.target.id === "tipoActivo") { S.tipoActivo = e.target.value; render(); }
+  if (e.target.id === "objPct")     { S.objPct = +e.target.value; render(); }
+  if (e.target.id === "semanas")    { S.semanas = +e.target.value; render(); }
+  if (e.target.id === "simOffline") { S.sinConexion = e.target.checked; S.iaResultados = null; render(); }
+  if (e.target.id === "simular")    { S.simular = e.target.checked; render(); }
+});
+
+document.addEventListener("input", e => {
+  const id = e.target.id;
+  if (id !== "busqueda" && id !== "iaTexto") return;
+  if (id === "busqueda") S.busqueda = e.target.value; else S.iaTexto = e.target.value;
+  const pos = e.target.selectionStart;
+  render();
+  const el = document.getElementById(id);
+  if (el) { el.focus(); el.setSelectionRange(pos, pos); }
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.id === "iaTexto") {
+    document.querySelector("[data-iabuscar]")?.click();
+  }
+});
+
+render();
+</script>
+</body>
+</html>

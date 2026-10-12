@@ -1,0 +1,28 @@
+@page
+@model KcalTracker.Pages.RegistroModel
+@{
+    ViewData["Title"] = "Crear cuenta";
+}
+
+<div class="tarjeta-angosta">
+    <h1>Crear cuenta</h1>
+    <p>Cada cuenta ve solo sus datos. Después te pedimos la medición de arranque y el objetivo.</p>
+
+    <form method="post">
+        <div asp-validation-summary="All" class="error"></div>
+
+        <label asp-for="Nombre">Nombre <span class="opcional">(opcional)</span></label>
+        <input asp-for="Nombre" autocomplete="name" autofocus />
+
+        <label asp-for="Email">Correo</label>
+        <input asp-for="Email" type="email" autocomplete="username" />
+
+        <label asp-for="Clave">Contraseña</label>
+        <input asp-for="Clave" type="password" autocomplete="new-password" />
+        <p class="ayuda">Al menos 8 caracteres.</p>
+
+        <button type="submit" class="btn-pri">Crear cuenta</button>
+    </form>
+
+    <p class="auth-pie">¿Ya tenés una? <a asp-page="/Ingreso">Ingresar</a></p>
+</div>

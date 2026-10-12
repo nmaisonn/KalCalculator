@@ -1,0 +1,96 @@
+@model KcalTracker.Pages.ListaCatalogoModelo
+@using KcalTracker.Servicios
+@{
+    var idCaja = $"cat-{Model.Catalogo}";
+}
+
+<section class="catalogo" id="@idCaja">
+    <div class="catalogo-cabeza">
+        <h2>@Model.Titulo</h2>
+        <form method="post" asp-page="/Ajustes" asp-page-handler="AgregarTipo"
+              hx-post="@Url.Page("/Ajustes", "AgregarTipo")"
+              hx-target="#@idCaja"
+              hx-swap="outerHTML"
+              hx-disabled-elt="this"
+              class="alta">
+            <input type="hidden" name="catalogo" value="@Model.Catalogo" />
+            <input type="text" name="nombre" placeholder="Agregar…" required maxlength="80" />
+            <button type="submit" class="btn-sec">Agregar</button>
+        </form>
+    </div>
+    @if (Model.Error is not null)
+    {
+        <p class="error">@Model.Error</p>
+    }
+    @if (Model.Items.Count == 0)
+    {
+        <p class="ayuda">Todavía no hay ninguno. Agregá el primero o importá una plantilla.</p>
+    }
+    else
+    {
+        <ul class="lista-tipos">
+            @foreach (var item in Model.Items)
+            {
+                <li class="@(item.Activo ? "" : "apagado")">
+                    <form method="post" asp-page="/Ajustes" asp-page-handler="RenombrarTipo"
+                          hx-post="@Url.Page("/Ajustes", "RenombrarTipo")"
+                          hx-target="#@idCaja" hx-swap="outerHTML"
+                          hx-trigger="submit, change"
+                          hx-disabled-elt="this"
+                          class="fila">
+                        <input type="hidden" name="catalogo" value="@Model.Catalogo" />
+                        <input type="hidden" name="id" value="@item.Id" />
+                        <input type="text" name="nombre" value="@item.Nombre" maxlength="80" aria-label="Nombre" />
+                    </form>
+                    <span class="muted mini">@(item.Activo ? "" : "inactivo")@(item.Usos > 0 ? (item.Activo ? $"{item.Usos}" : $" · {item.Usos}") : "")</span>
+                    <div class="cat-acciones">
+                        <form method="post" asp-page="/Ajustes" asp-page-handler="SubirTipo"
+                              hx-post="@Url.Page("/Ajustes", "SubirTipo")"
+                              hx-target="#@idCaja" hx-swap="outerHTML">
+                            <input type="hidden" name="catalogo" value="@Model.Catalogo" />
+                            <input type="hidden" name="id" value="@item.Id" />
+                            <button type="submit" class="btn-ghost" title="Subir" aria-label="Subir">↑</button>
+                        </form>
+                        <form method="post" asp-page="/Ajustes" asp-page-handler="BajarTipo"
+                              hx-post="@Url.Page("/Ajustes", "BajarTipo")"
+                              hx-target="#@idCaja" hx-swap="outerHTML">
+                            <input type="hidden" name="catalogo" value="@Model.Catalogo" />
+                            <input type="hidden" name="id" value="@item.Id" />
+                            <button type="submit" class="btn-ghost" title="Bajar" aria-label="Bajar">↓</button>
+                        </form>
+                        @if (item.Activo)
+                        {
+                            <form method="post" asp-page="/Ajustes" asp-page-handler="DesactivarTipo"
+                                  hx-post="@Url.Page("/Ajustes", "DesactivarTipo")"
+                                  hx-target="#@idCaja" hx-swap="outerHTML">
+                                <input type="hidden" name="catalogo" value="@Model.Catalogo" />
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <button type="submit" class="btn-ghost" title="Desactivar">Off</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <form method="post" asp-page="/Ajustes" asp-page-handler="ActivarTipo"
+                                  hx-post="@Url.Page("/Ajustes", "ActivarTipo")"
+                                  hx-target="#@idCaja" hx-swap="outerHTML">
+                                <input type="hidden" name="catalogo" value="@Model.Catalogo" />
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <button type="submit" class="btn-ghost" title="Activar">On</button>
+                            </form>
+                        }
+                        @if (item.Usos == 0)
+                        {
+                            <form method="post" asp-page="/Ajustes" asp-page-handler="EliminarTipo"
+                                  hx-post="@Url.Page("/Ajustes", "EliminarTipo")"
+                                  hx-target="#@idCaja" hx-swap="outerHTML">
+                                <input type="hidden" name="catalogo" value="@Model.Catalogo" />
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <button type="submit" class="btn-borrar" title="Borrar">×</button>
+                            </form>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</section>

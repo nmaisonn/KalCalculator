@@ -1,0 +1,233 @@
+@page
+@model KcalTracker.Pages.MedicionesModel
+@using KcalTracker
+@using KcalTracker.Calculo
+@{
+    ViewData["Title"] = "Mediciones";
+    ViewData["Nav"] = "mediciones";
+    var tab = Model.EsAvance ? "avance" : "lista";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Mediciones</h1>
+        <p class="lede">@(tab == "avance"
+            ? "Avance desde la medición de referencia. Solo entran las pesadas marcadas contra la báscula (los lunes en ayunas, misma hora)."
+            : "Peso y composición. Los kg de grasa y músculo se derivan, no se tipean. Las gráficas arrancan en la medición de referencia. Marcá «contra la báscula» las pesadas en ayunas a la misma hora; las otras se guardan pero no entran en la comparación ni en las gráficas.")</p>
+    </div>
+    @if (tab == "avance")
+    {
+        <div class="page-actions">
+            <a class="btn-sec" asp-page="/Objetivo">Objetivo</a>
+        </div>
+    }
+</div>
+<div class="page-body">
+
+@if (Model.Mensaje is not null)
+{
+    <p class="ok">@Model.Mensaje</p>
+}
+@if (Model.Error is not null)
+{
+    <p class="error">@Model.Error</p>
+}
+
+<nav class="tabs" aria-label="Secciones de mediciones">
+    <a class="@(tab == "lista" ? "on" : "")" asp-page="/Mediciones">Lista</a>
+    <a class="@(tab == "avance" ? "on" : "")" asp-page="/Mediciones" asp-route-tab="avance">Avance</a>
+</nav>
+
+@if (Model.Confirmacion is { } borrar)
+{
+    <section class="bloque ajuste-peligro">
+        <h2>¿Eliminar la medición del @Formato.FechaCorta(borrar.Fecha)?</h2>
+        <p>@borrar.PesoKg.ToString("0.#") kg
+            @if (borrar.GrasaPct is { } g) { <text>· @g.ToString("0.#") % grasa</text> }
+            @if (borrar.MusculoPct is { } mu) { <text>· @mu.ToString("0.#") % músculo</text> }
+        </p>
+        @if (Model.AvisoEliminar is not null)
+        {
+            <p>@Model.AvisoEliminar</p>
+        }
+        <div class="ajuste-cta">
+            <a class="btn-sec" asp-page="/Mediciones" asp-route-tab="@(Model.EsAvance ? "avance" : null)">Cancelar</a>
+            <form method="post" asp-page-handler="Eliminar" asp-route-id="@borrar.Id">
+                <input type="hidden" asp-for="Tab" />
+                <button type="submit" class="btn-peligro">Eliminar</button>
+            </form>
+        </div>
+    </section>
+}
+
+@if (tab == "avance")
+{
+    @if (Model.Referencia?.Medicion.EsReferencia != true && Model.FechaInicioObjetivo is null)
+    {
+        <p class="aviso">Marcá una medición como referencia (o cargá la fecha de arranque en <a asp-page="/Objetivo">Objetivo</a>) para recortar las gráficas a ese tramo.</p>
+    }
+    else if (Model.Avance is { } av)
+    {
+        <p class="chart-lectura">@av.Lectura</p>
+        @if (av.Peso is { } pe && av.Pesadas >= 2)
+        {
+            <div class="stats">
+                <div class="stat"><div class="l">Peso</div><div class="v">@Formato.Kg(pe.Hasta, 1)<span class="u">kg · @(pe.Delta > 0.05 ? "+" : pe.Delta < -0.05 ? "−" : "")@Formato.Kg(Math.Abs(pe.Delta), 1)</span></div></div>
+                @if (av.GrasaPct is { } gp)
+                {
+                    <div class="stat"><div class="l">Grasa</div><div class="v">@gp.Hasta.ToString("0.#")<span class="u">% · @(gp.Delta > 0.05 ? "+" : gp.Delta < -0.05 ? "−" : "")@Math.Abs(gp.Delta).ToString("0.#") pp</span></div></div>
+                }
+                @if (av.MusculoPct is { } mp)
+                {
+                    <div class="stat"><div class="l">Músculo</div><div class="v">@mp.Hasta.ToString("0.#")<span class="u">% · @(mp.Delta > 0.05 ? "+" : mp.Delta < -0.05 ? "−" : "")@Math.Abs(mp.Delta).ToString("0.#") pp</span></div></div>
+                }
+                <div class="stat"><div class="l">Pesadas</div><div class="v">@av.Pesadas</div></div>
+            </div>
+        }
+        <div class="graficos-med">
+            @foreach (var g in av.Graficos)
+            {
+                <partial name="_GraficoSerie" model="g" />
+            }
+        </div>
+        <p class="muted">Si una pesada no fue en las mismas condiciones, desmarcá «contra la báscula» en Lista: sale de estas gráficas al toque.</p>
+    }
+}
+else
+{
+    <section class="bloque">
+        <h2>@(Model.Editando ? "Editar medición" : "Nueva medición")</h2>
+        <form method="post" asp-page-handler="Guardar">
+            <input type="hidden" asp-for="Id" />
+            <div class="form-grid">
+                <div>
+                    <label asp-for="Fecha">Fecha</label>
+                    <input asp-for="Fecha" type="date" class="corto" />
+                </div>
+                <div>
+                    <label asp-for="PesoKg">Peso (kg)</label>
+                    <input asp-for="PesoKg" type="number" step="0.1" class="corto" />
+                </div>
+                <div>
+                    <label asp-for="GrasaPct">Grasa (%)</label>
+                    <input asp-for="GrasaPct" type="number" step="0.1" class="corto" />
+                    @if (Model.PesoKg > 0 && Model.GrasaPct is { } gp)
+                    {
+                        <p class="muted mini">→ @Redondeo.Kg(Composicion.GrasaKg(Model.PesoKg, gp)!.Value) kg de grasa</p>
+                    }
+                </div>
+                <div>
+                    <label asp-for="MusculoPct">Músculo (%)</label>
+                    <input asp-for="MusculoPct" type="number" step="0.1" class="corto" />
+                </div>
+                <div>
+                    <label asp-for="Visceral">Grasa visceral</label>
+                    <input asp-for="Visceral" type="number" step="0.1" class="corto" />
+                </div>
+                <div class="span-2">
+                    <label asp-for="Nota">Nota <span class="opcional">(opcional)</span></label>
+                    <input asp-for="Nota" />
+                </div>
+                <label class="opcion span-2">
+                    <input asp-for="EsComparable" />
+                    <span>
+                        Contra la báscula
+                        <span class="detalle">Pesada en las mismas condiciones (ayunas, misma hora). Si fue a otra hora o después de comer, desmarcala: queda guardada pero no entra en la comparación, la calibración ni las gráficas.</span>
+                    </span>
+                </label>
+            </div>
+            @if (Model.EsLaReferencia)
+            {
+                <p class="aviso">Es la medición de referencia: cambiarla recalcula el gasto basal@(Model.Referencia?.BmrKcal is { } bmr ? $" (hoy {bmr} kcal)" : "") y el plan de objetivo.</p>
+            }
+            <div class="ajuste-cta">
+                <button type="submit" class="btn-pri">Guardar</button>
+                @if (Model.Editando)
+                {
+                    <a class="btn-sec" asp-page="/Mediciones">Cancelar</a>
+                }
+            </div>
+        </form>
+    </section>
+
+    @if (Model.Historial is { Graficos.Count: > 0 } hist)
+    {
+        <p class="chart-lectura">@hist.Lectura</p>
+        <div class="graficos-med">
+            @foreach (var g in hist.Graficos)
+            {
+                <partial name="_GraficoSerie" model="g" />
+            }
+        </div>
+    }
+
+    @if (Model.Lista.Count == 0)
+    {
+        <p class="muted">Todavía no hay mediciones.</p>
+    }
+    else
+    {
+        <div class="tabla-wrap">
+            <table class="datos">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Peso</th>
+                        <th>Grasa %</th>
+                        <th>Grasa kg</th>
+                        <th>Músc %</th>
+                        <th>Músc kg</th>
+                        <th>Visc.</th>
+                        <th>Báscula</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var m in Model.Lista)
+                {
+                    var grasaKg = Composicion.GrasaKg(m.PesoKg, m.GrasaPct);
+                    var muscKg = Composicion.MusculoKg(m.PesoKg, m.MusculoPct);
+                    <tr class="@(Model.Referencia?.Medicion.Id == m.Id ? "ref" : null)@(!m.EsComparable ? " no-bascula" : null)">
+                        <td>@Formato.FechaCorta(m.Fecha)</td>
+                        <td>@m.PesoKg.ToString("0.#")</td>
+                        <td>@(m.GrasaPct?.ToString("0.#") ?? "—")</td>
+                        <td>@(grasaKg is { } gk ? Redondeo.Kg(gk).ToString("0.00") : "—")</td>
+                        <td>@(m.MusculoPct?.ToString("0.#") ?? "—")</td>
+                        <td>@(muscKg is { } mk ? Redondeo.Kg(mk).ToString("0.00") : "—")</td>
+                        <td>@(m.Visceral?.ToString("0.#") ?? "—")</td>
+                        <td>
+                            <form method="post" asp-page-handler="Comparable" class="inline">
+                                <input type="hidden" name="id" value="@m.Id" />
+                                <input type="hidden" name="on" value="@(!m.EsComparable)" />
+                                <button type="submit" class="@(m.EsComparable ? "pill" : "btn-sec")" title="@(m.EsComparable ? "Entra en la comparación y las gráficas. Tocá para sacarla." : "No entra en la comparación ni en las gráficas. Tocá si fue en ayunas a la misma hora.")">@(m.EsComparable ? "sí" : "no")</button>
+                            </form>
+                        </td>
+                        <td class="fila-acciones">
+                            @if (Model.Referencia?.Medicion.Id != m.Id)
+                            {
+                                <form method="post" asp-page-handler="Referencia" asp-route-id="@m.Id" class="inline">
+                                    <button type="submit" class="btn-sec">Usar como referencia</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <span class="pill">referencia</span>
+                            }
+                            <a class="btn-sec" asp-page="/Mediciones" asp-route-id="@m.Id">Editar</a>
+                            <a class="btn-borrar" asp-page="/Mediciones" asp-route-eliminar="@m.Id">Borrar</a>
+                        </td>
+                    </tr>
+                    @if (!string.IsNullOrWhiteSpace(m.Nota))
+                    {
+                        <tr class="@(Model.Referencia?.Medicion.Id == m.Id ? "ref" : null)@(!m.EsComparable ? " no-bascula" : null)">
+                            <td colspan="9" class="muted mini">@m.Nota</td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+        <p class="muted">Las columnas en kg se derivan al leer. La fila marcada es la referencia del gasto: no tiene que ser la más nueva. «Contra la báscula» es aparte: solo esas pesadas entran en el contraste del dashboard y en las gráficas.</p>
+    }
+}
+</div>

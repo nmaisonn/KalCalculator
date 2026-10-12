@@ -1,0 +1,161 @@
+@page
+@model KcalTracker.Pages.SesionModel
+@using System.Globalization
+@using KcalTracker
+@{
+    ViewData["Title"] = "Sesión de gym";
+    ViewData["Nav"] = "gym";
+    string N(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+}
+
+<div class="page-head">
+    <div>
+        <h1>Sesión de gym</h1>
+        <p class="lede">Elegí un día de la rutina. Se precarga lo prescrito; cambiá solo lo que hiciste distinto. La progresión es el termómetro: si comés siempre más o menos lo mismo, acá se ve si las cargas siguen subiendo.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn-sec" asp-page="/Rutinas">Rutinas</a>
+    </div>
+</div>
+<div class="page-body">
+<form method="get" class="fila-busca">
+    <input type="date" name="Fecha" value="@Model.Fecha.ToString("yyyy-MM-dd")" />
+    <button type="submit" class="btn-sec">Ver fecha</button>
+</form>
+
+<div class="row">
+    @foreach (var d in Model.Dias)
+    {
+        <form method="post" asp-page-handler="Abrir" asp-route-dia="@d.Id" class="inline">
+            <input type="hidden" name="Fecha" value="@Model.Fecha.ToString("yyyy-MM-dd")" />
+            <button type="submit" class="chip @(Model.Sesion?.RutinaDiaId == d.Id ? "on" : "")">@d.Nombre</button>
+        </form>
+    }
+</div>
+
+@if (Model.Sesion is { } s)
+{
+    <section class="bloque">
+        <h2>Lo que hiciste</h2>
+        <form method="post" asp-page-handler="Guardar">
+            <input type="hidden" asp-for="SesionId" />
+            <input type="hidden" name="Fecha" value="@Model.Fecha.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="ej" value="@Model.EjercicioSel" />
+            <div class="form-grid">
+                <div>
+                    <label>kcal de esta sesión</label>
+                    <input asp-for="Kcal" type="number" step="1" class="corto" />
+                </div>
+                <div>
+                    <label asp-for="Cantidad">Cuánto hiciste</label>
+                    <input asp-for="Cantidad" type="number" step="0.1" min="0.1" max="20" class="corto" />
+                    <p class="ayuda">1 = sesión completa. 0,5 o 50 % deja la mitad de las kcal.</p>
+                </div>
+            </div>
+            <p class="ayuda">0,5 = media sesión: al guardar, las kcal se recortan a la mitad. Las series las podés ajustar acá.</p>
+            <div class="tabla-wrap">
+                <table class="datos">
+                    <thead><tr><th>Ejercicio</th><th>Series</th><th>Reps</th><th>Peso</th><th></th></tr></thead>
+                    <tbody>
+                    @for (var i = 0; i < s.Ejercicios.Count; i++)
+                    {
+                        var e = s.Ejercicios.OrderBy(x => x.Orden).ElementAt(i);
+                        <tr class="@(e.Id == Model.EjercicioSel ? "ref" : "")">
+                            <td>
+                                <input type="hidden" name="EjId[@i]" value="@e.Id" />
+                                @e.Nombre
+                                @if (!string.IsNullOrEmpty(e.Observacion)) { <span class="muted">(@e.Observacion)</span> }
+                            </td>
+                            <td><input name="Series[@i]" type="number" value="@e.Series" class="corto" /></td>
+                            <td><input name="Reps[@i]" type="number" value="@e.Reps" class="corto" /></td>
+                            <td><input name="Peso[@i]" type="number" step="0.1" value="@e.Peso" class="corto" /></td>
+                            <td class="fila-acciones">
+                                @if (e.EjercicioId is not null)
+                                {
+                                    <a class="chip @(e.Id == Model.EjercicioSel ? "on" : "")" asp-page="/Sesion" asp-route-id="@s.Id" asp-route-ej="@e.Id">Progresión</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <div class="ajuste-cta">
+                <button type="submit" class="btn-pri">Guardar sesión</button>
+            </div>
+        </form>
+        <form method="post" asp-page-handler="Borrar" asp-route-id="@s.Id">
+            <input type="hidden" name="Fecha" value="@s.Fecha.ToString("yyyy-MM-dd")" />
+            <div class="ajuste-cta">
+                <button type="submit" class="btn-peligro">Eliminar sesión</button>
+            </div>
+        </form>
+    </section>
+
+    @if (Model.Puntos is { Count: > 0 } pts)
+    {
+        <section class="chart-box" id="progresion">
+            <h2>Progresión@(string.IsNullOrEmpty(Model.EjercicioNombre) ? "" : " · " + Model.EjercicioNombre)</h2>
+            @if (Model.Resumen is { } r)
+            {
+                var signo = r.DeltaKg > 0.05 ? "+" : r.DeltaKg < -0.05 ? "−" : "";
+                var cls = r.DeltaKg > 0.05 ? "ok" : r.DeltaKg < -0.05 ? "bad" : "";
+                <p class="chart-lectura">
+                    @if (r.Sesiones == 1)
+                    {
+                        <text>Una sesión con @Formato.Kg(r.HastaKg, 1) kg. Con otra que tenga peso se dibuja la pendiente.</text>
+                    }
+                    else if (Math.Abs(r.DeltaKg) <= 0.05 && r.MaxKg - r.MinKg > 0.05)
+                    {
+                        <text>Arrancaste y cerraste en @Formato.Kg(r.HastaKg, 1) kg en @r.Sesiones sesiones (piso @Formato.Kg(r.MinKg, 1) kg).</text>
+                    }
+                    else if (Math.Abs(r.DeltaKg) <= 0.05)
+                    {
+                        <text>Mantuviste @Formato.Kg(r.HastaKg, 1) kg en @r.Sesiones sesiones.</text>
+                    }
+                    else
+                    {
+                        <text>De @Formato.Kg(r.DesdeKg, 1) a @Formato.Kg(r.HastaKg, 1) kg · <span class="@cls">@signo@Formato.Kg(Math.Abs(r.DeltaKg), 1) kg · @signo@Formato.Pct(Math.Abs(r.DeltaFraccion))</span> en @r.Sesiones sesiones.</text>
+                    }
+                </p>
+            }
+            @if (Model.Grafico is { } g)
+            {
+                <div class="prog-graf">
+                    <svg viewBox="0 0 @N(g.Ancho) @N(g.Alto)" role="img" aria-label="Peso de @Model.EjercicioNombre en el tiempo">
+                        <path class="linea" d="@g.Path" />
+                        @foreach (var p in g.Puntos)
+                        {
+                            var ultimo = p == g.Puntos[^1];
+                            <circle class="punto @(ultimo ? "ultimo" : "")" cx="@N(p.X)" cy="@N(p.Y)" r="@(ultimo ? 4 : 3)">
+                                <title>@Formato.FechaCorta(p.Fecha) · @Formato.Kg(p.Peso) kg@(p.Reps is { } reps ? $" · {reps} reps" : "")</title>
+                            </circle>
+                        }
+                        <text class="eje" x="4" y="@N(g.YMaxY + 4)">@Formato.Kg(g.YMaxKg, 1)</text>
+                        <text class="eje" x="4" y="@N(g.YMinY + 4)">@Formato.Kg(g.YMinKg, 1)</text>
+                        <text class="eje" x="@N(g.XIni)" y="@N(g.Alto - 6)">@Formato.FechaCorta(g.Puntos[0].Fecha)</text>
+                        <text class="eje" x="@N(g.XFin)" y="@N(g.Alto - 6)" text-anchor="end">@Formato.FechaCorta(g.Puntos[^1].Fecha)</text>
+                    </svg>
+                </div>
+            }
+            <div class="tabla-wrap">
+                <table class="datos">
+                    <thead><tr><th>Fecha</th><th>Peso</th><th>Reps</th></tr></thead>
+                    <tbody>
+                    @foreach (var p in pts)
+                    {
+                        <tr><td>@Formato.FechaCorta(p.Fecha)</td><td>@Formato.Kg(p.Peso) kg</td><td>@(p.Reps?.ToString() ?? "—")</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+}
+else if (Model.Dias.Count == 0)
+{
+    <section class="bloque">
+        <p class="muted" style="margin:0">No hay rutina activa. Importala o creala en <a asp-page="/Rutinas">Rutinas</a>.</p>
+    </section>
+}
+</div>

@@ -1,0 +1,171 @@
+@model IndexModel
+@using KcalTracker
+@using KcalTracker.Calculo
+@using KcalTracker.Servicios
+@{
+    var v = Model.Vista;
+    var b = v.Balance;
+    var fechaIso = Model.Fecha.ToString("yyyy-MM-dd");
+}
+
+<div id="hoy-comidas">
+<partial name="_HoyHero" />
+
+@if (v.Medicion is null)
+{
+    <div class="callout-row">
+        <div>
+            <div class="t">Falta una medición</div>
+            <div class="d">Cargá una <a asp-page="/Mediciones">medición</a> para poder calcular tu gasto.</div>
+        </div>
+    </div>
+}
+
+@if (b.Gasto.PosibleDobleConteo)
+{
+    <div class="callout-row">
+        <div>
+            <div class="t">Posible doble conteo</div>
+            <div class="d">Hoy marcaste Gym o cardio y también una actividad del catálogo. Si el gym ya cubre eso, quitá una para no sumar de más.</div>
+        </div>
+        <a class="btn-sec" href="#entreno">Revisar</a>
+    </div>
+}
+
+@if (Model.Error is not null)
+{
+    <div class="callout-row callout-error"><div class="t">@Model.Error</div></div>
+}
+@if (Model.Mensaje is not null)
+{
+    <p class="ok">@Model.Mensaje</p>
+}
+
+@if (v.Tipos.Count == 0)
+{
+    <p class="muted">Definí tipos de comida en <a asp-page="/Ajustes" asp-route-tab="tipos">Ajustes</a>.</p>
+}
+else
+{
+    <div class="comidas-dia">
+        @foreach (var tipo in v.Tipos)
+        {
+            var grupo = v.Comidas.FirstOrDefault(g => g.Tipo.Id == tipo.Id);
+            var combosTipo = v.Combos.Where(c => c.TipoComidaId is null || c.TipoComidaId == tipo.Id).ToList();
+            var combosOtros = v.Combos.Where(c => c.TipoComidaId is { } tid && tid != tipo.Id).ToList();
+            var gruposAlim = GruposAlimentoHoy.De(v.Alimentos);
+            <section class="comida-card">
+                <header>
+                    <h3>@tipo.Nombre</h3>
+                    @if (grupo is { } gKcal)
+                    {
+                        <span class="pill">@Formato.Kcal(gKcal.Subtotal)<span>kcal</span></span>
+                    }
+                </header>
+                <div class="slot-carga">
+                    <form method="post" asp-page-handler="AgregarSlot"
+                          hx-post="?handler=AgregarSlot" hx-target="#hoy-comidas" hx-swap="outerHTML show:none focus-scroll:false"
+                          hx-disabled-elt="this">
+                        <input type="hidden" name="Fecha" value="@fechaIso" />
+                        <input type="hidden" name="tipoComidaId" value="@tipo.Id" />
+                        <label class="sr" for="slot-@tipo.Id">Agregar a @tipo.Nombre</label>
+                        <select id="slot-@tipo.Id" name="Eleccion" autocomplete="off"
+                                hx-post="?handler=AgregarSlot" hx-target="#hoy-comidas"
+                                hx-swap="outerHTML show:none focus-scroll:false" hx-include="closest form" hx-trigger="change"
+                                hx-disabled-elt="closest form">
+                            <option value="">Combo o alimento…</option>
+                            @if (combosTipo.Count > 0)
+                            {
+                                <optgroup label="Combos de @tipo.Nombre.ToLower()">
+                                @foreach (var c in combosTipo)
+                                {
+                                    var kcalCombo = c.Items.Sum(i => (i.Alimento?.Kcal ?? 0) * i.Cantidad);
+                                    <option value="c:@c.Id">@c.Nombre · @Formato.Kcal(kcalCombo)</option>
+                                }
+                                </optgroup>
+                            }
+                            @if (combosOtros.Count > 0)
+                            {
+                                <optgroup label="Otros combos">
+                                @foreach (var c in combosOtros)
+                                {
+                                    var kcalCombo = c.Items.Sum(i => (i.Alimento?.Kcal ?? 0) * i.Cantidad);
+                                    <option value="c:@c.Id">@c.Nombre · @Formato.Kcal(kcalCombo)</option>
+                                }
+                                </optgroup>
+                            }
+                            @foreach (var ga in gruposAlim)
+                            {
+                                <optgroup label="@ga.Etiqueta">
+                                @foreach (var a in ga.Items)
+                                {
+                                    <option value="a:@a.Id">@a.Nombre · @Formato.Kcal(a.Kcal)</option>
+                                }
+                                </optgroup>
+                            }
+                        </select>
+                    </form>
+                    <button type="button" class="btn-sec" data-abrir-puntual
+                            data-handler="AgregarSlot"
+                            data-hx-target="#hoy-comidas"
+                            data-tipo="@tipo.Id"
+                            data-titulo="Agregar a @tipo.Nombre"
+                            data-ayuda="No se guarda en alimentos. Solo entra en este día.">Agregar</button>
+                </div>
+                @if (grupo is { } g)
+                {
+                    <ul class="comida-items">
+                        @{
+                            var vistos = new HashSet<string>();
+                        }
+                        @foreach (var itemComido in g.Comida.Items)
+                        {
+                            if (itemComido.GrupoId is { Length: > 0 } gid)
+                            {
+                                if (!vistos.Add(gid)) continue;
+                                var delGrupo = g.Comida.Items.Where(i => i.GrupoId == gid).ToList();
+                                var kcalGrupo = delGrupo.Sum(i => i.Kcal * i.Cantidad);
+                                var factor = delGrupo[0].GrupoFactor <= 0 ? 1 : delGrupo[0].GrupoFactor;
+                                <li class="combo-grupo">
+                                    <div class="combo-cabeza">
+                                        <span class="nom">
+                                            <span>@(delGrupo[0].GrupoNombre ?? "Combo")</span>
+                                            <span class="por">plato</span>
+                                        </span>
+                                        <partial name="_FraccionHecha" model="VistaFraccion.Grupo(fechaIso, gid, factor)" />
+                                        <span class="kcal-txt">@Formato.Kcal(kcalGrupo) kcal</span>
+                                        <form method="post" asp-page-handler="QuitarGrupo"
+                                              hx-post="?handler=QuitarGrupo" hx-target="#hoy-comidas" hx-swap="outerHTML show:none focus-scroll:false" class="inline">
+                                            <input type="hidden" name="Fecha" value="@fechaIso" />
+                                            <input type="hidden" name="grupoId" value="@gid" />
+                                            <button type="submit" class="btn-borrar" title="Quitar el combo" aria-label="Quitar el combo">×</button>
+                                        </form>
+                                    </div>
+                                    <ul class="combo-ingredientes">
+                                        @foreach (var lineaCombo in delGrupo)
+                                        {
+                                            <partial name="_HoyLineaComida" model="new VistaHoyLinea(lineaCombo, fechaIso)" />
+                                        }
+                                    </ul>
+                                </li>
+                            }
+                            else
+                            {
+                                <partial name="_HoyLineaComida" model="new VistaHoyLinea(itemComido, fechaIso)" />
+                            }
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p class="vacio-tramo">Vacío. Elegí un combo o alimento, o agregá uno puntual.</p>
+                }
+            </section>
+        }
+    </div>
+}
+</div>
+@if (Context.Request.Headers.ContainsKey("HX-Request"))
+{
+    <partial name="_HoyDeficitMini" />
+}

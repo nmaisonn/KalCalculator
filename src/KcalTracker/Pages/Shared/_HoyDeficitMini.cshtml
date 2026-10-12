@@ -1,0 +1,31 @@
+@model IndexModel
+@using KcalTracker
+@using KcalTracker.Calculo
+@{
+    var v = Model.Vista;
+    var b = v.Balance;
+    var meta = v.Deficit;
+    var obj = meta is { Diario: > 0 } d ? d.Diario : (double?)null;
+    var superavit = meta?.EsSuperavit == true;
+    var valorHoy = b.Deficit is { } defHoy ? (superavit ? -defHoy : defHoy) : (double?)null;
+    var oob = Context.Request.Headers.ContainsKey("HX-Request");
+    var cls = b.HayRegistro && valorHoy is { } vh && obj is { } objetivoHoy
+        ? vh >= objetivoHoy ? "ok" : vh < 0 ? "bad" : "warn"
+        : "";
+}
+@if (b.HayRegistro && valorHoy is { } val && obj is { } objHead)
+{
+    <span id="hoy-deficit-mini" class="hero-mini @cls" hx-swap-oob="@(oob ? "outerHTML" : false)">
+        @(val >= 0 ? "" : "−")@Formato.Kcal(Math.Abs(val))<span class="u">/ @Formato.Kcal(objHead)</span>
+    </span>
+}
+else if (obj is { } objSolo)
+{
+    <span id="hoy-deficit-mini" class="hero-mini" hx-swap-oob="@(oob ? "outerHTML" : false)">
+        <span class="u">obj. @Formato.Kcal(objSolo)</span>
+    </span>
+}
+else
+{
+    <span id="hoy-deficit-mini" class="hero-mini" hidden hx-swap-oob="@(oob ? "outerHTML" : false)"></span>
+}

@@ -1,0 +1,198 @@
+@page
+@model KcalTracker.Pages.BienvenidaModel
+@using KcalTracker.Calculo
+@using KcalTracker.Datos.Plantillas
+@using KcalTracker.Dominio
+@{
+    ViewData["Title"] = Model.Repetir ? "Importar plantillas" : "Bienvenida";
+    if (Model.EsAlta) ViewData["Alta"] = true;
+    string ClasePaso(string paso)
+    {
+        var orden = new[] { BienvenidaModel.PasoVos, BienvenidaModel.PasoObjetivo, BienvenidaModel.PasoPlantilla };
+        var actual = Array.IndexOf(orden, Model.Paso);
+        var este = Array.IndexOf(orden, paso);
+        if (este == actual) return "on";
+        return este < actual ? "hecho" : "";
+    }
+}
+
+<div class="tarjeta-angosta alta">
+    @if (Model.EsAlta)
+    {
+        <ol class="pasos">
+            <li class="hecho">Cuenta</li>
+            <li class="@(ClasePaso(BienvenidaModel.PasoVos))">
+                <a asp-page="/Bienvenida" asp-route-paso="@BienvenidaModel.PasoVos">Vos</a>
+            </li>
+            <li class="@(ClasePaso(BienvenidaModel.PasoObjetivo))">
+                <a asp-page="/Bienvenida" asp-route-paso="@BienvenidaModel.PasoObjetivo">Objetivo</a>
+            </li>
+            <li class="@(ClasePaso(BienvenidaModel.PasoPlantilla))">
+                <a asp-page="/Bienvenida" asp-route-paso="@BienvenidaModel.PasoPlantilla">Catálogos</a>
+            </li>
+        </ol>
+    }
+
+    @if (Model.Error is not null)
+    {
+        <p class="error">@Model.Error</p>
+    }
+
+    @if (Model.Paso == BienvenidaModel.PasoVos)
+    {
+        <h1>Tus datos de arranque</h1>
+        <p>Con edad, peso, altura, sexo y cómo es tu día fuera del gym alcanza para estimar gasto, calorías y macros. El % de grasa y el GER de báscula afinan, no son obligatorios.</p>
+
+        <form method="post" asp-page-handler="GuardarVos">
+            <input type="hidden" asp-for="Paso" />
+            <input type="hidden" asp-for="MedicionId" />
+
+            <h2>Sobre vos</h2>
+            <label asp-for="Nombre">Nombre <span class="opcional">(opcional)</span></label>
+            <input asp-for="Nombre" autocomplete="name" />
+
+            <label asp-for="AlturaCm">Altura (cm)</label>
+            <input asp-for="AlturaCm" type="number" step="0.1" class="corto" />
+
+            <label asp-for="FechaNacimiento">Fecha de nacimiento</label>
+            <input asp-for="FechaNacimiento" type="date" />
+
+            <p class="etiqueta">Sexo</p>
+            <p class="ayuda">Mifflin-St Jeor lo usa para el basal. Si preferís no decirlo, cargá % de grasa o el GER de la báscula.</p>
+            <div class="opciones-h">
+                <label class="opcion-chip"><input type="radio" asp-for="SexoElegido" value="m" /> Masculino</label>
+                <label class="opcion-chip"><input type="radio" asp-for="SexoElegido" value="f" /> Femenino</label>
+                <label class="opcion-chip"><input type="radio" asp-for="SexoElegido" value="" /> Prefiero no decirlo</label>
+            </div>
+
+            <p class="etiqueta">Actividad fuera del gym</p>
+            <p class="ayuda">Sin contar entrenamiento. Gym, cinta y deporte se suman aparte.</p>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="FactorElegido" value="1.2" />
+                <span class="txt"><strong>Sedentario</strong><span class="muted">Trabajo de escritorio</span></span>
+                <span class="kcal-op">× 1,2</span>
+            </label>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="FactorElegido" value="1.35" />
+                <span class="txt"><strong>Oficina y algo de caminar</strong></span>
+                <span class="kcal-op">× 1,35</span>
+            </label>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="FactorElegido" value="1.5" />
+                <span class="txt"><strong>Muy activo</strong><span class="muted">Trabajo de pie</span></span>
+                <span class="kcal-op">× 1,5</span>
+            </label>
+            <label class="opcion-fila">
+                <input type="radio" asp-for="FactorElegido" value="otro" />
+                <span class="txt"><strong>Otro valor</strong>
+                    <input asp-for="FactorLibre" type="number" step="0.01" class="corto" inputmode="decimal" onclick="this.closest('label').querySelector('input[type=radio]').checked = true" />
+                </span>
+            </label>
+
+            <h2>Medición de arranque</h2>
+            <p class="ayuda">La pesada de mañana en ayunas. El % de grasa y el GER de báscula son extra: sin ellos el basal sale de Mifflin-St Jeor.</p>
+            <label asp-for="FechaMedicion">Fecha</label>
+            <input asp-for="FechaMedicion" type="date" class="corto" />
+            <label asp-for="PesoKg">Peso (kg)</label>
+            <input asp-for="PesoKg" type="number" step="0.1" class="corto" />
+            <label asp-for="GrasaPct">Grasa (%) <span class="opcional">(opcional)</span></label>
+            <input asp-for="GrasaPct" type="number" step="0.1" class="corto" />
+            <label asp-for="BmrMedido">GER de la báscula (kcal) <span class="opcional">(opcional)</span></label>
+            <input asp-for="BmrMedido" type="number" step="1" class="corto" />
+            <p class="ayuda">Si tu Omron u otra báscula da metabolismo en reposo, cargalo. Si no, lo estimamos con peso, altura, edad y sexo.</p>
+
+            <div class="acciones-bienvenida">
+                <button type="submit" asp-page-handler="OmitirVos" class="btn-sec" formnovalidate>Ahora no</button>
+                <button type="submit" class="btn-pri">Continuar</button>
+            </div>
+        </form>
+    }
+    else if (Model.Paso == BienvenidaModel.PasoObjetivo)
+    {
+        <h1>Tu objetivo</h1>
+        <p>Elegí corte, recomposición o ganancia. Si hay % de grasa, el recorte y los techos salen de tus kilos y de tu composición (Helms/ACSM). Si no, de un porcentaje del gasto cotidiano (ISSN: @Formato.Pct(ValoresDeFabrica.PctDeficitCorte) corte, @Formato.Pct(ValoresDeFabrica.PctDeficitRecomp) recomp, @Formato.Pct(0.10) superávit).</p>
+
+        <form method="post" asp-page-handler="GuardarObjetivo"
+              hx-post="?handler=RecalcularObjetivo"
+              hx-target="#bienvenida-objetivo-calc"
+              hx-swap="outerHTML"
+              hx-sync="this:replace"
+              hx-validate="false"
+              hx-trigger="input changed delay:80ms from:body target:input[name='PlazoSemanas'], change from:body target:input[name='PlazoSemanas'], input changed delay:80ms from:body target:input[name='GrasaObjetivoPct'], change from:body target:input[name='GrasaObjetivoPct'], change from:body target:input[name='TipoObjetivo']">
+            <input type="hidden" asp-for="Paso" />
+            <label asp-for="GrasaObjetivoPct">Grasa corporal objetivo (%) <span class="opcional">(opcional)</span></label>
+            <input asp-for="GrasaObjetivoPct" type="number" step="0.1" min="5" max="50" class="corto" />
+            <p class="ayuda">Sirve si cargaste % de grasa. Sin eso, las semanas marcan el techo, no los kilos a perder.</p>
+
+            <label asp-for="PlazoSemanas">Plazo (semanas)</label>
+            <input asp-for="PlazoSemanas" type="number" min="1" step="1" class="corto" id="PlazoSemanas" />
+
+            <partial name="_BienvenidaObjetivoCalc" />
+
+            <div class="acciones-bienvenida">
+                <button type="submit" asp-page-handler="OmitirObjetivo" class="btn-sec" formnovalidate>Ahora no</button>
+                <button type="submit" class="btn-pri">Continuar</button>
+            </div>
+        </form>
+    }
+    else
+    {
+        @if (Model.Repetir)
+        {
+            <h1>Importar plantillas</h1>
+            <p>Lo que marques se copia a tu cuenta. Si un ítem ya existe, se deja como está.</p>
+        }
+        else
+        {
+            <h1>¿Con qué catálogos arrancás?</h1>
+            <p>El catálogo de alimentos de la app ya está disponible para registrar desde el primer día. Acá elegís si además copiás plantillas a tu cuenta. Nada queda fijo: lo tuyo es editable después.</p>
+        }
+
+        <form method="post">
+            <input type="hidden" asp-for="Repetir" />
+            <input type="hidden" asp-for="Paso" />
+
+            <label class="opcion">
+                <input type="radio" asp-for="Modo" value="vacio" />
+                <span>
+                    <b>Arrancar vacío</b>
+                    <span class="detalle">Sin copiar plantillas. El catálogo de alimentos de la app sigue disponible si lo tenés activo en Ajustes.</span>
+                </span>
+            </label>
+
+            <label class="opcion">
+                <input type="radio" asp-for="Modo" value="plantilla" />
+                <span>
+                    <b>Importar una plantilla y editarla</b>
+                    <span class="detalle">@Model.Plantilla.Nombre. @Model.Plantilla.Descripcion</span>
+                </span>
+            </label>
+
+            <div class="partes-plantilla">
+                @foreach (var opcion in Model.Opciones)
+                {
+                    var marcada = Model.Partes.Contains(opcion.Parte);
+                    <label class="parte">
+                        <input type="checkbox" name="Partes" value="@opcion.Parte" @(marcada ? "checked" : null) />
+                        <span>
+                            <b>@opcion.Titulo</b>
+                            <span class="detalle">@opcion.Detalle</span>
+                        </span>
+                    </label>
+                }
+            </div>
+
+            <div class="acciones-bienvenida">
+                @if (Model.Repetir)
+                {
+                    <a class="btn-sec" asp-page="/Ajustes" asp-route-tab="cuenta">Cancelar</a>
+                }
+                else
+                {
+                    <button type="submit" asp-page-handler="Omitir" class="btn-sec">Omitir</button>
+                }
+                <button type="submit" asp-page-handler="Importar" class="btn-pri">Importar y empezar</button>
+            </div>
+        </form>
+    }
+</div>

@@ -1,0 +1,94 @@
+@page
+@model EjerciciosModel
+@{
+    ViewData["Title"] = "Ejercicios";
+    ViewData["Nav"] = "ejercicios";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Ejercicios</h1>
+        <p class="lede">Agrupados por el grupo muscular que definiste en Ajustes. El catálogo es independiente de las rutinas.</p>
+    </div>
+    <div class="page-actions">
+        <a class="btn-pri" asp-page="/Ejercicios" asp-route-nuevo="true">+ Nuevo ejercicio</a>
+    </div>
+</div>
+<div class="page-body">
+
+@if (Model.Mensaje is not null) { <p class="ok">@Model.Mensaje</p> }
+@if (Model.Error is not null) { <p class="error">@Model.Error</p> }
+
+@if (Model.Editando is not null)
+{
+    <section class="bloque">
+        <h2>@(Model.Id == 0 ? "Nuevo ejercicio" : "Editar ejercicio")</h2>
+        <form method="post" asp-page-handler="Guardar">
+            <input type="hidden" asp-for="Id" />
+            <div class="form-grid">
+                <div>
+                    <label>Nombre</label>
+                    <input asp-for="Nombre" />
+                </div>
+                <div>
+                    <label>Grupo muscular</label>
+                    <select asp-for="GrupoMuscularId">
+                        <option value="">Sin grupo</option>
+                        @foreach (var g in Model.Grupos)
+                        {
+                            <option value="@g.Id">@g.Nombre</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="ajuste-cta">
+                <button type="submit" class="btn-pri">Guardar</button>
+                <a class="btn-sec" asp-page="/Ejercicios">Cancelar</a>
+                @if (Model.Id != 0)
+                {
+                    <button type="submit" formaction="@Url.Page("/Ejercicios", "Borrar", new { id = Model.Id })" class="btn-peligro" formnovalidate>Desactivar</button>
+                }
+            </div>
+        </form>
+    </section>
+}
+
+@if (Model.Lista.Count == 0)
+{
+    <section class="bloque">
+        <p class="muted" style="margin:0">No hay ejercicios. Importá la plantilla o cargá uno a mano.</p>
+        <div class="ajuste-cta">
+            <a class="btn-pri" asp-page="/Ejercicios" asp-route-nuevo="true">+ Nuevo ejercicio</a>
+            <a class="btn-sec" asp-page="/Rutinas">Ir a rutinas</a>
+        </div>
+    </section>
+}
+else
+{
+    <div class="tabla-wrap">
+        <table class="datos">
+            <thead>
+                <tr><th>Grupo</th><th>Ejercicio</th><th>Rutinas</th><th>Sesiones</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var f in Model.Lista)
+            {
+                <tr>
+                    <td>@(f.Ejercicio.GrupoMuscular?.Nombre ?? "—")</td>
+                    <td>@f.Ejercicio.Nombre</td>
+                    <td>@(f.Rutinas == 0 ? "—" : f.Rutinas.ToString())</td>
+                    <td>@(f.Sesiones == 0 ? "—" : f.Sesiones.ToString())</td>
+                    <td class="fila-acciones">
+                        <a class="btn-sec" asp-page="/Ejercicios" asp-route-id="@f.Ejercicio.Id">Editar</a>
+                        <form method="post" asp-page-handler="Borrar" asp-route-id="@f.Ejercicio.Id" class="inline">
+                            <button type="submit" class="btn-borrar">Borrar</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <p class="muted"><a asp-page="/Rutinas">Ir a rutinas</a></p>
+}
+</div>

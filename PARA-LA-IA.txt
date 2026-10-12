@@ -1,0 +1,91 @@
+INSTRUCCIONES PARA UNA IA — dejar kcal-tracker corriendo en esta máquina
+=======================================================================
+
+Quién te escribe: una persona que NO es informática. Tu trabajo es instalar
+lo mínimo, clonar el repo, levantar la app y dejar el navegador en
+http://localhost:5236. No expliques git ni .NET salvo que algo falle.
+No pidas permiso para los pasos de instalación y arranque. Si falta la URL
+del repo, pedila UNA vez y pará.
+
+URL_DEL_REPO:
+https://github.com/nmaisonn/KalCalculator.git
+(Si el clone pide login, el repo es privado: la persona tiene que estar
+invitada en GitHub. No inventes un token.)
+
+CARPETA DESTINO:
+La carpeta del usuario (Documentos o la que use Cursor). El clone tiene que
+dejar un directorio que contenga KcalTracker.slnx. Ese directorio es el
+workspace: abrilo en Cursor si todavía no está abierto.
+
+SISTEMA
+-------
+Windows, macOS o Linux. No hace falta Visual Studio, Node, Python, Docker
+ni base de datos extra.
+
+PASOS (en este orden)
+---------------------
+1) Git
+   - Si `git --version` funciona, seguí.
+   - Si no: instalá Git.
+     Windows: https://git-scm.com/download/win  (o winget install Git.Git)
+     Después abrí una terminal NUEVA.
+
+2) .NET SDK 10
+   - Corré: dotnet --version
+   - El número tiene que empezar con 10.
+   - Si no hay `dotnet` o no es 10.x: instalá el SDK 10 (no el Runtime solo)
+     desde https://dotnet.microsoft.com/download/dotnet/10.0
+     Windows x64: el instalador "SDK". Después, terminal NUEVA.
+
+3) Clonar
+   git clone https://github.com/nmaisonn/KalCalculator.git kcal-tracker
+   cd kcal-tracker
+
+4) Abrir el proyecto
+   El workspace es la raíz (dónde está KcalTracker.slnx). Leé README.md
+   y seguilo. Resumen:
+
+   dotnet restore
+   dotnet test
+   dotnet run --project src/KcalTracker --launch-profile http
+
+5) Cuando la terminal diga "Now listening on: http://localhost:5236",
+   abrí esa URL en el navegador.
+
+6) CUENTA
+   Vas a ver "Entrar". No uses cuentas que ya estén en la base.
+   Clic en "Crear una cuenta".
+   - Correo: uno que elija la persona (puede ser inventado tipo yo@localhost
+     si no quiere usar el real; tiene que parecer un email).
+   - Contraseña: mínimo 8 caracteres. Anotásela a la persona.
+   Si aparece Bienvenida / plantillas: puede importar o seguir. No es
+   obligatorio para que la app ande.
+
+7) Éxito = se ve la pantalla Hoy (o Bienvenida) logueado, sin error 500.
+   Dejá el servidor corriendo. No hagas commit, no subas nada, no borres
+   data/kcal.db, no pongas claves de OpenAI ni USDA (no hacen falta).
+
+SI ALGO FALLA
+-------------
+- Puerto 5236 ocupado: cerrá el KcalTracker / dotnet run anterior y reintentá.
+- `KcalTracker.exe` locked al testear: cortá el servidor y volvé a `dotnet test`.
+- `dotnet --version` sigue sin ser 10 después de instalar: la terminal es vieja;
+  cerrala y abrí otra, o reiniciá Cursor.
+- Clone con error de autenticación: el repo es privado; la persona tiene que
+  aceptar el acceso o pasarte un repo público.
+- No hay KcalTracker.slnx después del clone: estás en el directorio incorrecto
+  (a veces GitHub pone un subdirectorio extra). Entrá al que tiene el .slnx.
+
+NO HAGAS
+--------
+No instales PostgreSQL, SQL Server, IIS, ni “subas a Azure”.
+No reescribas el proyecto en otro stack.
+No borres la base SQLite del repo.
+No commitees.
+No trates de “arreglar” el gasto mezclando gym dentro del GET: está así
+a propósito (está en el README).
+
+Cuando termines, decile en castellano sencillo: la dirección
+(http://localhost:5236), el correo que registraste y que para parar la app
+cierra la terminal o Ctrl+C. Para volver a abrirla, desde la carpeta
+kcal-tracker: el mismo `dotnet run --project src/KcalTracker --launch-profile http`.

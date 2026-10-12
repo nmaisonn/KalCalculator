@@ -1,0 +1,271 @@
+@page
+@model KcalTracker.Pages.DashboardModel
+@using KcalTracker
+@using KcalTracker.Calculo
+@{
+    ViewData["Title"] = "Dashboard";
+    ViewData["Nav"] = "dashboard";
+    var m = Model.Metricas;
+    var objDia = Model.ObjetivoDiario;
+    var superavit = Model.EsSuperavit;
+    var hoy = DateOnly.FromDateTime(DateTime.Today);
+    double Valor(DiaDePeriodo diaP) => superavit ? -(diaP.Deficit ?? 0) : (diaP.Deficit ?? 0);
+    var conR = m.Serie.Where(d => d.HayRegistro).ToList();
+    var maxEje = conR.SelectMany(d => new[] { d.Ingesta ?? 0, d.Gasto }).DefaultIfEmpty(0).Max();
+    if (maxEje < 1) maxEje = 1;
+    var gastoMedio = conR.Count == 0 ? 0 : conR.Average(d => d.Gasto);
+    var kp = m.ProteinaMedia * 4;
+    var kc = m.CarbosMedia * 4;
+    var kg = m.GrasaMedia * 9;
+    var kx = Math.Max(0, m.IngestaMedia - kp - kc - kg);
+    var totM = kp + kc + kg + kx;
+    if (totM <= 0) totM = 1;
+    string Lectura()
+    {
+        if (m.DiasConRegistro == 0)
+            return "Todavía no hay comida cargada en este período. Un día vacío no cuenta como déficit 0: no entra en las medias.";
+        var verbo = superavit ? "superávit" : "déficit";
+        var objTxt = objDia > 0 ? $" El objetivo de {Model.NombreObjetivo.ToLower()} es {Formato.Kcal(objDia)} kcal/día." : "";
+        if (m.DiasConRegistro == 1)
+        {
+            var d = conR[0];
+            var val1 = Valor(d);
+            var extra = val1 < 0 && !superavit ? " Ese día comiste más de lo que gastaste." : "";
+            return $"El {Formato.FechaDia(d.Fecha)} comiste {Formato.Kcal(d.Ingesta ?? 0)} kcal y gastaste {Formato.Kcal(d.Gasto)}: {verbo} {Formato.Kcal(Math.Abs(val1))} kcal.{extra}{objTxt}";
+        }
+        var signo = m.DeficitMedio < 0 && !superavit ? " En el promedio, comiste más de lo que gastaste." : "";
+        return $"Cargaste {m.DiasConRegistro} de {m.DiasTotales} días. En esos, de media comiste {Formato.Kcal(m.IngestaMedia)} kcal y gastaste {Formato.Kcal(gastoMedio)}: {verbo} {Formato.Kcal(Math.Abs(m.DeficitMedio))} kcal.{signo}{objTxt}";
+    }
+}
+
+<div class="page-head">
+    <div>
+        <h1>Dashboard</h1>
+        <p class="lede">@Model.NombreObjetivo · @Formato.Rango(Model.DesdeEfectivo, Model.HastaEfectivo). Cómo te fue en los días que sí cargaste, y si eso pega con la báscula.</p>
+    </div>
+    <div class="page-actions">
+        <a class="chip @(Model.Periodo == "semana" ? "on" : "")" asp-page="/Dashboard" asp-route-periodo="semana">Esta semana</a>
+        <a class="chip @(Model.Periodo == "mes" ? "on" : "")" asp-page="/Dashboard" asp-route-periodo="mes">Este mes</a>
+        <a class="chip @(Model.Periodo == "10d" ? "on" : "")" asp-page="/Dashboard" asp-route-periodo="10d">Últimos 10 días</a>
+        <a class="btn-sec" asp-page="/Dashboard" asp-page-handler="Exportar"
+           asp-route-periodo="@Model.Periodo"
+           asp-route-desde="@Model.DesdeEfectivo.ToString("yyyy-MM-dd")"
+           asp-route-hasta="@Model.HastaEfectivo.ToString("yyyy-MM-dd")"
+           title="Comida, gym, cardio, deporte y mediciones de estas fechas, para pasárselo a una IA">Exportar para analizar</a>
+    </div>
+</div>
+<div class="page-body">
+<form method="get" class="fila-busca">
+    <input type="hidden" name="Periodo" value="@Model.Periodo" />
+    <input type="date" name="Desde" value="@Model.DesdeEfectivo.ToString("yyyy-MM-dd")" />
+    <input type="date" name="Hasta" value="@Model.HastaEfectivo.ToString("yyyy-MM-dd")" />
+    <button type="submit" class="btn-sec">Cambiar período</button>
+</form>
+<p class="muted mini">El Excel de este período lleva toda la alimentación, el desglose de gym/cardio/deporte (lo que suma al gasto) y las mediciones. La hoja Para_IA explica cómo leerlo; está pensado para pasárselo a un modelo.</p>
+
+<section class="dash-progreso">
+    <div class="callout @(Model.Progreso.ClaseDia)">
+        <p class="t">El día</p>
+        <p>@Model.Progreso.TextoDia</p>
+    </div>
+    <div class="callout @(Model.Progreso.ClasePeriodo)">
+        <p class="t">@(Model.EtiquetaPeriodo switch {
+            "la semana" => "La semana",
+            "el mes" => "El mes",
+            "estos 10 días" => "Últimos 10 días",
+            _ => "El período"
+        })</p>
+        <p>@Model.Progreso.TextoPeriodo</p>
+    </div>
+</section>
+
+<section class="chart-box">
+    <h2>Comida y gasto, día por día</h2>
+    <p class="chart-lectura">@Lectura()</p>
+    <div class="dash-dias">
+        @foreach (var diaDash in m.Serie)
+        {
+            var val = Valor(diaDash);
+            var ing = diaDash.Ingesta ?? 0;
+            var wIng = diaDash.HayRegistro && maxEje > 0 ? ing / maxEje * 100 : 0;
+            var wGas = diaDash.HayRegistro && maxEje > 0 ? diaDash.Gasto / maxEje * 100 : 0;
+            var comioDeMas = diaDash.HayRegistro && ing > diaDash.Gasto;
+            var clsDelta = !diaDash.HayRegistro ? "muted"
+                : val < 0 ? "bad"
+                : objDia > 0 && val >= objDia ? "ok"
+                : objDia > 0 ? "warn"
+                : "ok";
+            var titulo = diaDash.HayRegistro
+                ? $"{Formato.DiaCorto(diaDash.Fecha)}: comiste {Formato.Kcal(ing)}, gastaste {Formato.Kcal(diaDash.Gasto)} → {(val >= 0 ? (superavit ? "superávit " : "déficit ") : "superávit ")}{Formato.Kcal(Math.Abs(val))} kcal"
+                : $"{Formato.DiaCorto(diaDash.Fecha)}: sin comida cargada. No entra en las medias.";
+            var marcas = string.Join(" · ", new[]
+            {
+                diaDash.KcalGym > 0 ? "gym" : null,
+                diaDash.KcalCardio > 0 ? "cardio" : null,
+                diaDash.KcalDeporte > 0 ? "deporte" : null
+            }.Where(x => x is not null));
+            <a class="dash-dia @(diaDash.HayRegistro ? "" : "vacio") @(diaDash.Fecha == hoy ? "hoy" : "")"
+               asp-page="/Index" asp-route-fecha="@diaDash.Fecha" title="@titulo">
+                <div class="dash-dia-meta">
+                    <span class="d">@Formato.DiaCorto(diaDash.Fecha)</span>
+                    @if (!string.IsNullOrEmpty(marcas))
+                    {
+                        <span class="m">@marcas</span>
+                    }
+                    else if (!diaDash.HayRegistro)
+                    {
+                        <span class="m">sin carga</span>
+                    }
+                </div>
+                <div class="dash-bars">
+                    @if (diaDash.HayRegistro)
+                    {
+                        <div class="dash-par">
+                            <div class="dash-fila">
+                                <span class="lab">comida</span>
+                                <div class="dash-pista">
+                                    <span class="dash-fill comida @(comioDeMas ? "alto" : "")" style="width:@(Formato.PctCss(wIng))%"></span>
+                                </div>
+                                <span class="n">@Formato.Kcal(ing)</span>
+                            </div>
+                            <div class="dash-fila">
+                                <span class="lab">gasto</span>
+                                <div class="dash-pista">
+                                    <span class="dash-fill gasto" style="width:@(Formato.PctCss(wGas))%"></span>
+                                </div>
+                                <span class="n">@Formato.Kcal(diaDash.Gasto)</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="dash-pista vacia"></div>
+                        <div class="dash-nums"><span>No entra en las medias</span></div>
+                    }
+                </div>
+                <div class="dash-delta @clsDelta">
+                    @if (!diaDash.HayRegistro)
+                    {
+                        <text>—</text>
+                    }
+                    else
+                    {
+                        @(val >= 0 ? "+" : "−")@Formato.Kcal(Math.Abs(val))
+                    }
+                </div>
+            </a>
+        }
+    </div>
+    <div class="legend">
+        <span><i style="background:var(--verde)"></i>Comida</span>
+        <span><i style="background:var(--noche);opacity:.35"></i>Gasto</span>
+        <span><i style="background:var(--ambar)"></i>Comiste más de lo que gastaste</span>
+        <span>El número de la derecha es el @(superavit ? "superávit" : "déficit"). Tocá el día para abrirlo.</span>
+    </div>
+</section>
+
+<div class="dash-c">
+    <div>
+        <div class="stats">
+            <div class="stat">
+                <div class="v @(m.DeficitAcumulado >= 0 ? "ok" : "bad")">@(m.DeficitAcumulado >= 0 ? "+" : "")@Formato.Kcal(m.DeficitAcumulado)</div>
+                <div class="l">@(superavit ? "Superávit" : "Déficit") de los días cargados</div>
+            </div>
+            <div class="stat">
+                <div class="v">@Formato.Kcal(m.DeficitMedio)</div>
+                <div class="l">Media de esos días</div>
+            </div>
+            <div class="stat">
+                <div class="v">@m.DiasConRegistro / @m.DiasTotales</div>
+                <div class="l">Días con comida · @((m.Cobertura * 100).ToString("0")) %</div>
+            </div>
+            <div class="stat">
+                <div class="v">@m.Adherencia / @(m.DiasConRegistro == 0 ? "—" : m.DiasConRegistro.ToString())</div>
+                <div class="l">@(superavit ? "Llegaron al superávit" : "Llegaron al recorte")</div>
+            </div>
+        </div>
+
+        <h3>Comida, en un vistazo</h3>
+        @if (m.DiasConRegistro == 0)
+        {
+            <p class="muted">Todavía no hay días con registro en este período.</p>
+        }
+        else
+        {
+            <div class="macrobar uso-macros">
+                @if (kp > 0) { <span style="width:@(Formato.PctCss(kp/totM*100))%;background:var(--verde)"></span> }
+                @if (kc > 0) { <span style="width:@(Formato.PctCss(kc/totM*100))%;background:var(--azul)"></span> }
+                @if (kg > 0) { <span style="width:@(Formato.PctCss(kg/totM*100))%;background:var(--ambar)"></span> }
+                @if (kx > 0) { <span style="width:@(Formato.PctCss(kx/totM*100))%;background:var(--gris)"></span> }
+            </div>
+            <div class="legend">
+                <span>Ingesta media @Formato.Kcal(m.IngestaMedia) kcal</span>
+                <span>
+                    <i style="background:var(--verde)"></i>P @Formato.G(m.ProteinaMedia) g
+                    @if (Model.Macros is { } mp)
+                    {
+                        <text> / @Formato.G(mp.ProteinaG) g</text>
+                    }
+                    else if (Model.ProteinaObjetivo is { } po)
+                    {
+                        <text> / @Formato.G(po) g</text>
+                    }
+                </span>
+                <span>
+                    <i style="background:var(--azul)"></i>C @Formato.G(m.CarbosMedia) g
+                    @if (Model.Macros is { } mc)
+                    {
+                        <text> / @Formato.G(mc.CarbosG) g</text>
+                    }
+                </span>
+                <span>
+                    <i style="background:var(--ambar)"></i>G @Formato.G(m.GrasaMedia) g
+                    @if (Model.Macros is { } mg)
+                    {
+                        <text> / @Formato.G(mg.GrasaG) g</text>
+                    }
+                </span>
+            </div>
+            <p class="muted mini">De afuera: @m.DiasAfuera días · @((m.PctAfuera * 100).ToString("0")) % de las kcal</p>
+        }
+    </div>
+    <div>
+        @if (!m.MuestraContraste)
+        {
+            <div class="callout warn">
+                <p><b>¿Coincide con la báscula?</b></p>
+                @if (m.GrasaMedidaKg is null)
+                {
+                    <p>Todavía no: hace falta al menos dos mediciones marcadas «contra la báscula» (ayunas, misma hora). Las pesadas de otra hora se guardan pero no entran. Mientras tanto las medias solo miran los días que sí cargaste.</p>
+                }
+                else
+                {
+                    <p>Todavía no: hace falta más cobertura (@((m.Cobertura * 100).ToString("0")) %, umbral @((Model.CobMinContraste * 100).ToString("0")) %) para contrastar con la última pesada comparable@(m.ContrasteHasta is { } f ? $" ({Formato.FechaCorta(f)})" : ""). Mientras tanto las medias solo miran los días que sí cargaste.</p>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="callout @(m.LecturaContraste?.Contains("calibrado") == true ? "ok" : "")">
+                <p><b>¿Coincide con la báscula?</b></p>
+                <p>Grasa estimada por el déficit@(m.ContrasteHasta is { } hastaEst ? $" hasta el {Formato.FechaCorta(hastaEst)}" : ""): <b>@Formato.Kg(m.GrasaEstimadaKg) kg</b></p>
+                <p>Grasa medida@(m.ContrasteDesde is { } desdeMed && m.ContrasteHasta is { } hastaMed ? $" ({Formato.FechaCorta(desdeMed)} → {Formato.FechaCorta(hastaMed)})" : ""): <b>@Formato.Kg(m.GrasaMedidaKg!.Value) kg</b></p>
+                <p>@m.LecturaContraste</p>
+            </div>
+        }
+
+        <h3>Entrenamiento</h3>
+        <div class="tabla-wrap">
+            <table class="datos">
+                <thead><tr><th></th><th class="num">días</th><th class="num">kcal</th></tr></thead>
+                <tbody>
+                    <tr><td>Gym</td><td class="num">@m.SesionesGym</td><td class="num">@Formato.Kcal(m.KcalGym)</td></tr>
+                    <tr><td>Cardio</td><td class="num">@m.SesionesCardio</td><td class="num">@Formato.Kcal(m.KcalCardio)</td></tr>
+                    <tr><td>Deporte</td><td class="num">@m.SesionesDeporte</td><td class="num">@Formato.Kcal(m.KcalDeporte)</td></tr>
+                    <tr><td>Sin moverse</td><td class="num">@m.DiasSinActividad</td><td class="num">—</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</div>
